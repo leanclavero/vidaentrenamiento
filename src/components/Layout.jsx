@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate, Outlet } from 'react-router-dom';
-import { LogOut, Home, Users, Target, Calendar, CheckSquare, ShieldCheck } from 'lucide-react';
+import { LogOut, Home, Users, Target, Calendar, CheckSquare, ShieldCheck, UserPlus } from 'lucide-react';
 
 export default function Layout() {
   const { user, profile, logout } = useAuth();
@@ -30,7 +30,15 @@ export default function Layout() {
             </Link>
           </li>
           {(role === 'Owner' || role === 'Admin' || role === 'Coach' || role === 'Coordinador') && (
+            {(profile?.rol_global === 'Owner' || profile?.rol_global === 'Admin') && (
             <li>
+              <Link to="/assignments">
+                <UserPlus size={20} />
+                <span>Asignaciones</span>
+              </Link>
+            </li>
+          )}
+          <li>
               <Link to="/editions">
                 <Calendar size={20} />
                 <span>Ediciones</span>
