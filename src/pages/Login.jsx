@@ -18,7 +18,13 @@ export default function Login() {
     if (err) {
       setError(err.message === 'Invalid login credentials' ? 'Credenciales incorrectas' : err.message);
     } else {
-      navigate('/');
+      const redirect = sessionStorage.getItem('redirect_after_login');
+      if (redirect) {
+        sessionStorage.removeItem('redirect_after_login');
+        navigate(redirect);
+      } else {
+        navigate('/');
+      }
     }
     setLoading(false);
   };

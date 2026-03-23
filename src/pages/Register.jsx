@@ -30,7 +30,6 @@ export default function Register() {
     }
 
     if (data?.user) {
-      // Create user profile in 'Usuarios' table
       const { error: dbError } = await supabase.from('Usuarios').insert([{
         uid: data.user.id,
         nombre,
@@ -42,7 +41,13 @@ export default function Register() {
         console.error("Error creating user profile", dbError);
       }
       
-      navigate('/');
+      const redirect = sessionStorage.getItem('redirect_after_login');
+      if (redirect) {
+        sessionStorage.removeItem('redirect_after_login');
+        navigate(redirect);
+      } else {
+        navigate('/');
+      }
     }
     
     setLoading(false);

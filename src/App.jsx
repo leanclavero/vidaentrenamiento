@@ -3,9 +3,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import JoinEdition from './pages/JoinEdition';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Ediciones from './pages/Ediciones';
+import Team from './pages/Team';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -29,6 +31,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/join/:id_edicion" element={<JoinEdition />} />
           
           <Route path="/" element={
             <PrivateRoute>
@@ -37,7 +40,7 @@ function App() {
           }>
             <Route index element={<Dashboard />} />
             <Route path="editions" element={<Ediciones />} />
-            <Route path="team" element={<Placeholder title="Mi Equipo Asignado" />} />
+            <Route path="team" element={<Team />} />
             <Route path="goals" element={<Placeholder title="Gestión de Metas" />} />
           </Route>
         </Routes>
