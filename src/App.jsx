@@ -3,29 +3,24 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
-
-const Dashboard = () => {
-  const { user, profile, logout } = useAuth();
-  return (
-    <div className="dashboard-layout">
-      <nav className="navbar">
-        <h1>Entrenamiento Coaching</h1>
-        <button onClick={logout} className="btn btn-secondary">Salir</button>
-      </nav>
-      <main className="main-content">
-        <h2>Bienvenido {profile?.nombre || user?.email}</h2>
-        <p>Tu rol temporalmente no está asignado o eres un participante base.</p>
-      </main>
-    </div>
-  );
-};
+import Layout from './components/Layout';
+import Dashboard from './pages/Dashboard';
+import Ediciones from './pages/Ediciones';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  if (loading) return <div>Cargando sesión...</div>;
+  if (loading) return <div style={{ color: 'var(--text-main)', padding: '2rem' }}>Cargando sesión...</div>;
   if (!user) return <Navigate to="/login" replace />;
   return children;
 };
+
+// Placeholder components for other routes
+const Placeholder = ({ title }) => (
+  <div className="card">
+    <h4>{title}</h4>
+    <p>Esta sección está en construcción.</p>
+  </div>
+);
 
 function App() {
   return (
@@ -34,11 +29,17 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          
           <Route path="/" element={
             <PrivateRoute>
-              <Dashboard />
+              <Layout />
             </PrivateRoute>
-          } />
+          }>
+            <Route index element={<Dashboard />} />
+            <Route path="editions" element={<Ediciones />} />
+            <Route path="team" element={<Placeholder title="Mi Equipo Asignado" />} />
+            <Route path="goals" element={<Placeholder title="Gestión de Metas" />} />
+          </Route>
         </Routes>
       </Router>
     </AuthProvider>
