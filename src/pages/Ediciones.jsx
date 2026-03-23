@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getEdiciones, createEdicion } from '../services/edicionesService';
+import { getEdiciones, createEdicion, updateEdicion } from '../services/edicionesService';
 import { useAuth } from '../context/AuthContext';
 
 export default function Ediciones() {
@@ -10,6 +10,7 @@ export default function Ediciones() {
 
   // Form states
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     nombre_grupo: '',
     fecha_inicio: '',
@@ -36,12 +37,33 @@ export default function Ediciones() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleCreate = async (e) => {
+  const handleOpenCreate = () => {
+    setEditingId(null);
+    setFormData({ nombre_grupo: '', fecha_inicio: '', fecha_fin: '' });
+    setIsFormOpen(!isFormOpen);
+  };
+
+  const handleEdit = (ed) => {
+    setIsFormOpen(true);
+    setEditingId(ed.id);
+    setFormData({
+      nombre_grupo: ed.nombre_grupo,
+      fecha_inicio: ed.fecha_inicio || '',
+      fecha_fin: ed.fecha_fin || ''
+    });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
-      await createEdicion(formData);
+      if (editingId) {
+        await updateEdicion(editingId, formData);
+      } else {
+        await createEdicion(formData);
+      }
       setIsFormOpen(false);
+      setEditingId(null);
       setFormData({ nombre_grupo: '', fecha_inicio: '', fecha_fin: '' });
       loadEdiciones();
     } catch (err) {
@@ -56,9 +78,9 @@ export default function Ediciones() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h2>Gestión de Ediciones</h2>
-        {(profile?.rol_global === 'Owner' || profile?.rol_global === 'Admin' || true) && ( // temporalmente enable para testear
-          <button className="btn btn-primary" style={{ width: 'auto', padding: '0.6rem 1.2rem' }} onClick={() => setIsFormOpen(!isFormOpen)}>
-            {isFormOpen ? 'Cancelar' : '+ Nueva Edición'}
+        {(profile?.rol_global === 'Owner' || profile?.rol_global === 'Admin' || true) && (
+          <button className="btn btn-primary" style={{ width: 'auto', padding: '0.6rem 1.2rem' }} onClick={handleOpenCreate}>
+            {isFormOpen && !editingId ? 'Cancelar' : '+ Nueva Edición'}
           </button>
         )}
       </div>
@@ -66,8 +88,8 @@ export default function Ediciones() {
       {error && <div className="error-msg">{error}</div>}
 
       {isFormOpen && (
-        <form onSubmit={handleCreate} className="card" style={{ marginBottom: '2rem' }}>
-          <h4>Crear Nueva Edición</h4>
+        <form onSubmit={handleSubmit} className="card" style={{ marginBottom: '2rem', border: editingId ? '1px solid var(--primary-color)' : 'none' }}>
+          <h4>{editingId ? 'Editar Edición' : 'Crear Nueva Edición'}</h4>
           <div className="form-group">
             <label>Nombre del Grupo</label>
             <input type="text" name="nombre_grupo" value={formData.nombre_grupo} onChange={handleChange} required placeholder="Ej: Generación 4" />
@@ -75,7 +97,7 @@ export default function Ediciones() {
           <div style={{ display: 'flex', gap: '1rem' }}>
             <div className="form-group" style={{ flex: 1 }}>
               <label>Fecha de Inicio</label>
-              <input type="date" name="nombre_grupo_2" style={{display:'none'}}/> {/* bugfix for react strict mode auto input */}
+              <input type="date" name="nombre_grupo_2" style={{display:'none'}}/>
               <input type="date" name="fecha_inicio" value={formData.fecha_inicio} onChange={handleChange} />
             </div>
             <div className="form-group" style={{ flex: 1 }}>
@@ -83,9 +105,16 @@ export default function Ediciones() {
               <input type="date" name="fecha_fin" value={formData.fecha_fin} onChange={handleChange} />
             </div>
           </div>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Guardando...' : 'Guardar Edición'}
-          </button>
+          <div style={{display:'flex', gap:'1rem'}}>
+             <button type="submit" className="btn btn-primary" disabled={loading} style={{width:'auto', padding:'0.5rem 1rem'}}>
+               {loading ? 'Guardando...' : (editingId ? 'Actualizar Edición' : 'Crear Edición')}
+             </button>
+             {editingId && (
+                <button type="button" className="btn btn-secondary" onClick={()=>setIsFormOpen(false)} style={{width:'auto', padding:'0.5rem 1rem'}}>
+                  Cancelar Edición
+                </button>
+             )}
+          </div>
         </form>
       )}
 
@@ -115,7 +144,7 @@ export default function Ediciones() {
             </div>
             
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
-              <button className="btn btn-secondary" style={{ padding: '0.6rem', fontSize: '0.85rem' }}>Ver Detalle</button>
+              <button className="btn btn-primary" onClick={() => handleEdit(ed)} style={{ padding: '0.6rem', fontSize: '0.85rem', flex: 1, border: '1px solid var(--primary-color)' }}>Editar Detalles</button>
             </div>
           </div>
         ))}
