@@ -75,6 +75,13 @@ export default function Asignaciones() {
       </div>
 
       {error && <div className="error-msg">{error}</div>}
+      
+      {!loading && users.length === 0 && (
+        <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+          <p>No se encontraron usuarios registrados.</p>
+          <small style={{ color: 'var(--text-muted)' }}>Esto puede deberse a políticas de seguridad (RLS) en Supabase o a que realmente no hay usuarios.</small>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
         {users.map((u) => (
