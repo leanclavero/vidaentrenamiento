@@ -29,8 +29,9 @@ export default function Layout() {
               <span>Dashboard</span>
             </Link>
           </li>
-          {(role === 'Owner' || role === 'Admin' || role === 'Coach' || role === 'Coordinador') && (
-            {(profile?.rol_global === 'Owner' || profile?.rol_global === 'Admin') && (
+          
+          {/* Menu for Owners/Admins specifically */}
+          {(profile?.rol_global === 'Owner' || profile?.rol_global === 'Admin') && (
             <li>
               <Link to="/assignments">
                 <UserPlus size={20} />
@@ -38,21 +39,36 @@ export default function Layout() {
               </Link>
             </li>
           )}
-          <li>
+
+          {/* Menu for Ediciones management (Staff only) */}
+          {(role === 'Owner' || role === 'Admin' || role === 'Coach' || role === 'Coordinador') && (
+            <li>
               <Link to="/editions">
                 <Calendar size={20} />
                 <span>Ediciones</span>
               </Link>
-          </li>
-          )}
-          {(role !== 'Participante') && (
-            <li>
-              <Link to="/team">
-                <Users size={20} />
-                <span>Mi Equipo</span>
-              </Link>
             </li>
           )}
+
+          {/* Validation menu for Staff (Seniors/Papisados/Admins/Coaches) */}
+          {(role !== 'Participante') && (
+            <>
+              <li>
+                <Link to="/approvals">
+                  <ShieldCheck size={20} />
+                  <span>Validar Evidencias</span>
+                </Link>
+              </li>
+              <li>
+                <Link to="/team">
+                  <Users size={20} />
+                  <span>Mi Equipo</span>
+                </Link>
+              </li>
+            </>
+          )}
+
+          {/* Standard user menu */}
           <li>
             <Link to="/goals">
               <Target size={20} />
