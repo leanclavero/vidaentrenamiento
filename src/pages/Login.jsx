@@ -21,9 +21,15 @@ export default function Login() {
       setError(err.message === 'Invalid login credentials' ? 'Credenciales incorrectas' : err.message);
     } else {
       const redirect = sessionStorage.getItem('redirect_after_login');
+      const pendingJoin = localStorage.getItem('pending_join');
+
       if (redirect) {
         sessionStorage.removeItem('redirect_after_login');
         navigate(redirect);
+      } else if (pendingJoin) {
+        const { id_edicion } = JSON.parse(pendingJoin);
+        // localStorage.removeItem('pending_join'); // No lo borramos aún, que lo borre JoinEdition al terminar exitoso
+        navigate(`/join/${id_edicion}${window.location.search}`);
       } else {
         navigate('/');
       }

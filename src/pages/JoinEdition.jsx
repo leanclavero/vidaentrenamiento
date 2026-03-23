@@ -15,18 +15,18 @@ export default function JoinEdition() {
   useEffect(() => {
     if (loading) return;
     
+    // Guardar la intención de unirse por si se pierde al navegar
+    localStorage.setItem('pending_join', JSON.stringify({ id_edicion, rol: rolParam }));
+
     if (!user) {
-      // Si no logueado, vamos al login pero podríamos usar context para redirigir tras loguear.
-      // Aquí simplificamos desviando al login para que el usuario se cree la cuenta, 
-      // luego deberá volver al link. En una v2 se guarda el intento en localStorage.
-      sessionStorage.setItem('redirect_after_login', `/join/${id_edicion}?rol=${rolParam}`);
-      navigate('/login', { replace: true });
+      setStatus('Debes iniciar sesión o registrarte para unirte a esta edición.');
       return;
     }
 
     const processJoin = async () => {
       try {
         await joinEdicionAsRole(user.id, id_edicion, rolParam);
+        localStorage.removeItem('pending_join');
         setStatus(`Te has unido a la edición con éxito como ${rolParam}. Redirigiendo al inicio...`);
         setTimeout(() => {
           navigate('/');
@@ -43,9 +43,20 @@ export default function JoinEdition() {
     <div className="login-container">
       <div className="login-box" style={{ textAlign: 'center' }}>
         <h2>Únete al Entrenamiento</h2>
-        <div style={{ marginTop: '2rem', color: 'var(--text-main)' }}>
+        <div style={{ marginTop: '2rem', color: 'var(--text-main)', marginBottom: '2rem' }}>
           <p>{status}</p>
         </div>
+        
+        {!user && !loading && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <Link to="/login" className="btn btn-primary" style={{ textDecoration: 'none' }}>
+              Iniciar Sesión
+            </Link>
+            <Link to="/register" className="btn btn-secondary" style={{ textDecoration: 'none' }}>
+              Crear Cuenta Nueva
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );
