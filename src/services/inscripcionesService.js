@@ -1,5 +1,15 @@
 import { supabase } from '../lib/supabase';
 
+// Obtener ediciones donde estoy enrolado
+export const getMisInscripciones = async (idUsuario) => {
+  const { data, error } = await supabase
+    .from('Inscripciones')
+    .select('*, edicion:Ediciones(*)')
+    .eq('id_usuario', idUsuario);
+  if (error) throw error;
+  return data;
+};
+
 // Obtener los participantes de una edición para mostrarlos (Admin/Coordinador)
 export const getInscripciones = async (idEdicion) => {
   const { data, error } = await supabase

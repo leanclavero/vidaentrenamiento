@@ -8,6 +8,7 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Ediciones from './pages/Ediciones';
 import Team from './pages/Team';
+import Metas from './pages/Metas';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -41,7 +42,7 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="editions" element={<Ediciones />} />
             <Route path="team" element={<Team />} />
-            <Route path="goals" element={<Placeholder title="Gestión de Metas" />} />
+            <Route path="goals" element={<Metas />} />
           </Route>
         </Routes>
       </Router>
