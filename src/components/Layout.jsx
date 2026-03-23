@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate, Outlet } from 'react-router-dom';
-import { LogOut, Home, Users, Target, Calendar } from 'lucide-react';
+import { LogOut, Home, Users, Target, Calendar, CheckSquare } from 'lucide-react';
 
 export default function Layout() {
   const { user, profile, logout } = useAuth();
@@ -49,6 +49,12 @@ export default function Layout() {
             <Link to="/goals">
               <Target size={20} />
               <span>Mis Metas</span>
+            </Link>
+          </li>
+          <li>
+            <Link to="/actions">
+              <CheckSquare size={20} />
+              <span>Mis Acciones</span>
             </Link>
           </li>
         </ul>

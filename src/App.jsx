@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Ediciones from './pages/Ediciones';
 import Team from './pages/Team';
 import Metas from './pages/Metas';
+import Declaraciones from './pages/Declaraciones';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -43,6 +44,7 @@ function App() {
             <Route path="editions" element={<Ediciones />} />
             <Route path="team" element={<Team />} />
             <Route path="goals" element={<Metas />} />
+            <Route path="actions" element={<Declaraciones />} />
           </Route>
         </Routes>
       </Router>
