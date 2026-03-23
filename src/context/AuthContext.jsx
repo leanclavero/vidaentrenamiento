@@ -54,6 +54,8 @@ export const AuthProvider = ({ children }) => {
       const { data: userResp } = await supabase.auth.getUser();
       if (userResp?.user?.email === 'plclavero@gmail.com') {
          finalData.rol_global = 'Owner';
+      } else if (userResp?.user?.email === 'vidaccion@live.com.ar') {
+         finalData.rol_global = 'Admin';
       }
       
       setProfile(finalData);
