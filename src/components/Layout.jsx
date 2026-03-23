@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate, Outlet } from 'react-router-dom';
-import { LogOut, Home, Users, Target, Calendar, CheckSquare } from 'lucide-react';
+import { LogOut, Home, Users, Target, Calendar, CheckSquare, ShieldCheck } from 'lucide-react';
 
 export default function Layout() {
   const { user, profile, logout } = useAuth();

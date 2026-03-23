@@ -10,6 +10,7 @@ import Ediciones from './pages/Ediciones';
 import Team from './pages/Team';
 import Metas from './pages/Metas';
 import Declaraciones from './pages/Declaraciones';
+import Aprobaciones from './pages/Aprobaciones';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -45,6 +46,7 @@ function App() {
             <Route path="team" element={<Team />} />
             <Route path="goals" element={<Metas />} />
             <Route path="actions" element={<Declaraciones />} />
+            <Route path="approvals" element={<Aprobaciones />} />
           </Route>
         </Routes>
       </Router>
