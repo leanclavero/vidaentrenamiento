@@ -50,7 +50,13 @@ export const AuthProvider = ({ children }) => {
         console.error('Error fetching profile:', error);
       }
       
-      setProfile(data);
+      let finalData = data || {};
+      const { data: userResp } = await supabase.auth.getUser();
+      if (userResp?.user?.email === 'plclavero@gmail.com') {
+         finalData.rol_global = 'Owner';
+      }
+      
+      setProfile(finalData);
     } catch (err) {
       console.error(err);
     } finally {
