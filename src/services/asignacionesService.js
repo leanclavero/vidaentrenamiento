@@ -6,7 +6,7 @@ export const getAllUsersWithEnrollments = async () => {
     .from('Usuarios')
     .select(`
       *,
-      Inscripciones (
+      Inscripciones!id_usuario (
         id,
         rol,
         id_edicion,
