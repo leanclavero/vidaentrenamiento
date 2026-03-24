@@ -93,16 +93,16 @@ export default function Team() {
         <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
           Comparte estos links para invitar a nuevos integrantes a esta Edición.
         </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '1rem' }}>
-          {['Participante', 'Senior', 'Papisado'].map(role => (
-            <div key={role} style={{ background: 'rgba(255,255,255,0.05)', padding: '0.75rem 1rem', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '1rem', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+          {['Participante', 'Senior'].map(role => (
+            <div key={role} style={{ background: 'rgba(255,255,255,0.05)', padding: '0.75rem 1rem', borderRadius: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', border: '1px solid var(--border-color)' }}>
               <span style={{ fontWeight: '600' }}>{role}</span>
               <button 
                 className="btn btn-secondary" 
-                style={{ padding: '0.4rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                style={{ width: 'auto', padding: '0.4rem 0.8rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}
                 onClick={() => copyToClipboard(getInvitationLink(role), role)}
               >
-                {copyStatus === role ? <CheckCircle size={16} color="#10b981" /> : <Copy size={16} />}
+                {copyStatus === role ? <CheckCircle size={14} color="#10b981" /> : <Copy size={14} />}
                 {copyStatus === role ? 'Copiado' : 'Copiar Link'}
               </button>
             </div>
@@ -149,38 +149,44 @@ export default function Team() {
                       <option value="Coach">Coach</option>
                     </select>
                   </td>
-                  <td style={{ padding: '0.75rem' }}>
-                    {assigningId === ins.id ? (
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <select 
-                          style={{ background: 'var(--card-bg)', color: 'var(--text-main)', padding: '0.2rem', borderRadius: '0.25rem' }}
-                          onChange={(e) => handleSuperiorChange(ins.id, e.target.value)}
-                          defaultValue=""
-                        >
-                          <option value="" disabled>Seleccionar...</option>
-                          <option value="null">Ninguno</option>
-                          {inscripciones
-                            .filter(i => i.usuario?.uid !== ins.usuario?.uid && ['Senior', 'Papisado', 'Coach', 'Coordinador', 'Admin'].includes(i.rol))
-                            .map(i => (
-                              <option key={i.usuario.uid} value={i.usuario.uid}>{i.usuario.nombre} {i.usuario.apellido} ({i.rol})</option>
-                            ))
-                          }
-                        </select>
-                        <button onClick={() => setAssigningId(null)} className="btn" style={{ padding: '0.1rem 0.4rem' }}>x</button>
-                      </div>
+                   <td style={{ padding: '0.75rem' }}>
+                    {ins.rol === 'Participante' ? (
+                      assigningId === ins.id ? (
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <select 
+                            style={{ background: 'var(--card-bg)', color: 'var(--text-main)', padding: '0.2rem', borderRadius: '0.25rem' }}
+                            onChange={(e) => handleSuperiorChange(ins.id, e.target.value)}
+                            defaultValue=""
+                          >
+                            <option value="" disabled>Seleccionar...</option>
+                            <option value="null">Ninguno</option>
+                            {inscripciones
+                              .filter(i => i.usuario?.uid !== ins.usuario?.uid && i.rol === 'Senior')
+                              .map(i => (
+                                <option key={i.usuario.uid} value={i.usuario.uid}>
+                                  {i.usuario.nombre && i.usuario.nombre !== 'Usuario' ? `${i.usuario.nombre} ${i.usuario.apellido}` : i.usuario.email.split('@')[0]}
+                                </option>
+                              ))
+                            }
+                          </select>
+                          <button onClick={() => setAssigningId(null)} className="btn" style={{ padding: '0.1rem 0.4rem', width: 'auto' }}>x</button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ color: ins.superior ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                            {ins.superior ? `${ins.superior.nombre} ${ins.superior.apellido}` : 'Sin asignar'}
+                          </span>
+                          <button 
+                            onClick={() => setAssigningId(ins.id)}
+                            className="btn btn-secondary" 
+                            style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem', width: 'auto' }}
+                          >
+                            {ins.superior ? 'Cambiar' : 'Asignar'}
+                          </button>
+                        </div>
+                      )
                     ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ color: ins.superior ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                          {ins.superior ? `${ins.superior.nombre} ${ins.superior.apellido}` : 'Sin asignar'}
-                        </span>
-                        <button 
-                          onClick={() => setAssigningId(ins.id)}
-                          className="btn btn-secondary" 
-                          style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
-                        >
-                          {ins.superior ? 'Cambiar' : 'Asignar'}
-                        </button>
-                      </div>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem italic' }}>Estructural</span>
                     )}
                   </td>
                   <td style={{ padding: '0.75rem' }}>

@@ -78,8 +78,8 @@ export default function Asignaciones() {
       
       {!loading && users.length === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-          <p>No se encontraron usuarios registrados.</p>
-          <small style={{ color: 'var(--text-muted)' }}>Esto puede deberse a políticas de seguridad (RLS) en Supabase o a que realmente no hay usuarios.</small>
+          <p style={{ fontSize: '1.2rem', fontWeight: '600', color: '#10b981' }}>¡Felicitaciones! No tienes asignaciones pendientes.</p>
+          <small style={{ color: 'var(--text-muted)' }}>Todos los usuarios registrados ya han sido asignados a sus ediciones.</small>
         </div>
       )}
 
