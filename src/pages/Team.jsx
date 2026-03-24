@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getEdiciones } from '../services/edicionesService';
 import { getInscripciones, updateInscripcion } from '../services/inscripcionesService';
+import { Copy, UserPlus, CheckCircle } from 'lucide-react';
 
 export default function Team() {
   const { profile } = useAuth();
@@ -9,6 +10,8 @@ export default function Team() {
   const [selectedEdicion, setSelectedEdicion] = useState('');
   const [inscripciones, setInscripciones] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [copyStatus, setCopyStatus] = useState('');
+  const [assigningId, setAssigningId] = useState(null); // ID of inscrip being assigned a superior
 
   // Load editions for the selector
   useEffect(() => {
@@ -43,13 +46,25 @@ export default function Team() {
     fetchInscripciones();
   }, [selectedEdicion]);
 
-  const handleRoleChange = async (id, newRole) => {
+  const handleSuperiorChange = async (inscripcionId, superiorUid) => {
     try {
-      await updateInscripcion(id, { rol: newRole });
-      setInscripciones(prev => prev.map(ins => ins.id === id ? { ...ins, rol: newRole } : ins));
+      await updateInscripcion(inscripcionId, { id_superior: superiorUid });
+      const sup = inscripciones.find(i => i.usuario.uid === superiorUid)?.usuario;
+      setInscripciones(prev => prev.map(ins => 
+        ins.id === inscripcionId 
+          ? { ...ins, id_superior: superiorUid, superior: sup ? { nombre: sup.nombre, apellido: sup.apellido } : null } 
+          : ins
+      ));
+      setAssigningId(null);
     } catch (err) {
-      alert("Error al cambiar rol");
+      alert("Error al asignar superior");
     }
+  };
+
+  const copyToClipboard = (text, type) => {
+    navigator.clipboard.writeText(text);
+    setCopyStatus(type);
+    setTimeout(() => setCopyStatus(''), 2000);
   };
 
   const getInvitationLink = (rol) => {
@@ -78,10 +93,20 @@ export default function Team() {
         <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
           Comparte estos links para invitar a nuevos integrantes a esta Edición.
         </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div><strong>Participante:</strong> <code style={{ userSelect: 'all', background: 'rgba(0,0,0,0.3)', padding: '0.2rem', borderRadius: '0.2rem' }}>{getInvitationLink('Participante')}</code></div>
-          <div><strong>Senior:</strong> <code style={{ userSelect: 'all', background: 'rgba(0,0,0,0.3)', padding: '0.2rem', borderRadius: '0.2rem' }}>{getInvitationLink('Senior')}</code></div>
-          <div><strong>Papisado:</strong> <code style={{ userSelect: 'all', background: 'rgba(0,0,0,0.3)', padding: '0.2rem', borderRadius: '0.2rem' }}>{getInvitationLink('Papisado')}</code></div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '1rem' }}>
+          {['Participante', 'Senior', 'Papisado'].map(role => (
+            <div key={role} style={{ background: 'rgba(255,255,255,0.05)', padding: '0.75rem 1rem', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '1rem', border: '1px solid var(--border-color)' }}>
+              <span style={{ fontWeight: '600' }}>{role}</span>
+              <button 
+                className="btn btn-secondary" 
+                style={{ padding: '0.4rem', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                onClick={() => copyToClipboard(getInvitationLink(role), role)}
+              >
+                {copyStatus === role ? <CheckCircle size={16} color="#10b981" /> : <Copy size={16} />}
+                {copyStatus === role ? 'Copiado' : 'Copiar Link'}
+              </button>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -105,7 +130,11 @@ export default function Team() {
             <tbody>
               {inscripciones.map(ins => (
                 <tr key={ins.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.75rem' }}>{ins.usuario?.nombre} {ins.usuario?.apellido}</td>
+                  <td style={{ padding: '0.75rem' }}>
+                    {ins.usuario?.nombre && ins.usuario?.nombre !== 'Usuario' 
+                      ? `${ins.usuario.nombre} ${ins.usuario.apellido}` 
+                      : ins.usuario?.email?.split('@')[0]}
+                  </td>
                   <td style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>{ins.usuario?.email}</td>
                   <td style={{ padding: '0.75rem' }}>
                     <select 
@@ -121,10 +150,47 @@ export default function Team() {
                     </select>
                   </td>
                   <td style={{ padding: '0.75rem' }}>
-                    {ins.superior ? `${ins.superior.nombre} ${ins.superior.apellido}` : 'Sin asignar'}
+                    {assigningId === ins.id ? (
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <select 
+                          style={{ background: 'var(--card-bg)', color: 'var(--text-main)', padding: '0.2rem', borderRadius: '0.25rem' }}
+                          onChange={(e) => handleSuperiorChange(ins.id, e.target.value)}
+                          defaultValue=""
+                        >
+                          <option value="" disabled>Seleccionar...</option>
+                          <option value="null">Ninguno</option>
+                          {inscripciones
+                            .filter(i => i.usuario?.uid !== ins.usuario?.uid && ['Senior', 'Papisado', 'Coach', 'Coordinador', 'Admin'].includes(i.rol))
+                            .map(i => (
+                              <option key={i.usuario.uid} value={i.usuario.uid}>{i.usuario.nombre} {i.usuario.apellido} ({i.rol})</option>
+                            ))
+                          }
+                        </select>
+                        <button onClick={() => setAssigningId(null)} className="btn" style={{ padding: '0.1rem 0.4rem' }}>x</button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ color: ins.superior ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                          {ins.superior ? `${ins.superior.nombre} ${ins.superior.apellido}` : 'Sin asignar'}
+                        </span>
+                        <button 
+                          onClick={() => setAssigningId(ins.id)}
+                          className="btn btn-secondary" 
+                          style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+                        >
+                          {ins.superior ? 'Cambiar' : 'Asignar'}
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '0.75rem' }}>
-                    <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}>Asignar Superior</button>
+                    <button 
+                      onClick={() => alert("Función de reporte próximamente")}
+                      className="btn btn-secondary" 
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                    >
+                      Ver Reporte
+                    </button>
                   </td>
                 </tr>
               ))}

@@ -84,7 +84,15 @@ export default function Asignaciones() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
-        {users.map((u) => (
+        {users
+          .filter(u => {
+            // No mostrar admin/owner de sistema (hardcoded o por rol global)
+            const isSystemAdmin = u.email === 'plclavero@gmail.com' || u.email === 'vidaccion@live.com.ar';
+            // No mostrar si ya tiene inscripciones (según pedido: "Los que ya fueron asignados, ya no deben aparecer")
+            const isAssigned = u.Inscripciones && u.Inscripciones.length > 0;
+            return !isSystemAdmin && !isAssigned;
+          })
+          .map((u) => (
           <div key={u.uid} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -92,7 +100,9 @@ export default function Asignaciones() {
                   <UserCheck size={20} color="var(--primary-color)" />
                 </div>
                 <div>
-                  <h4 style={{ margin: 0 }}>{u.nombre} {u.apellido}</h4>
+                  <h4 style={{ margin: 0 }}>
+                    {u.nombre && u.nombre !== 'Usuario' && u.nombre !== 'Usuario Nuevo' ? `${u.nombre} ${u.apellido}` : u.email.split('@')[0]}
+                  </h4>
                   <small style={{ color: 'var(--text-muted)' }}>{u.email}</small>
                 </div>
               </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Link, useNavigate, Outlet } from 'react-router-dom';
+import { NavLink, useNavigate, Outlet } from 'react-router-dom';
 import { LogOut, Home, Users, Target, Calendar, CheckSquare, ShieldCheck, UserPlus } from 'lucide-react';
 
 export default function Layout() {
@@ -24,29 +24,29 @@ export default function Layout() {
         </div>
         <ul className="sidebar-nav">
           <li>
-            <Link to="/">
+            <NavLink to="/">
               <Home size={20} />
               <span>Dashboard</span>
-            </Link>
+            </NavLink>
           </li>
           
           {/* Menu for Owners/Admins specifically */}
           {(profile?.rol_global === 'Owner' || profile?.rol_global === 'Admin') && (
             <li>
-              <Link to="/assignments">
+              <NavLink to="/assignments">
                 <UserPlus size={20} />
                 <span>Asignaciones</span>
-              </Link>
+              </NavLink>
             </li>
           )}
 
           {/* Menu for Ediciones management (Staff only) */}
           {(role === 'Owner' || role === 'Admin' || role === 'Coach' || role === 'Coordinador') && (
             <li>
-              <Link to="/editions">
+              <NavLink to="/editions">
                 <Calendar size={20} />
                 <span>Ediciones</span>
-              </Link>
+              </NavLink>
             </li>
           )}
 
@@ -54,32 +54,32 @@ export default function Layout() {
           {(role !== 'Participante') && (
             <>
               <li>
-                <Link to="/approvals">
+                <NavLink to="/approvals">
                   <ShieldCheck size={20} />
                   <span>Validar Evidencias</span>
-                </Link>
+                </NavLink>
               </li>
               <li>
-                <Link to="/team">
+                <NavLink to="/team">
                   <Users size={20} />
                   <span>Mi Equipo</span>
-                </Link>
+                </NavLink>
               </li>
             </>
           )}
 
           {/* Standard user menu */}
           <li>
-            <Link to="/goals">
+            <NavLink to="/goals">
               <Target size={20} />
               <span>Mis Metas</span>
-            </Link>
+            </NavLink>
           </li>
           <li>
-            <Link to="/actions">
+            <NavLink to="/actions">
               <CheckSquare size={20} />
               <span>Mis Acciones</span>
-            </Link>
+            </NavLink>
           </li>
         </ul>
         <div className="sidebar-footer">
