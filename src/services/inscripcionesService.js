@@ -16,8 +16,8 @@ export const getInscripciones = async (idEdicion) => {
     .from('Inscripciones')
     .select(`
       *,
-      usuario:Usuarios!id_usuario(nombre, apellido, email),
-      superior:Usuarios!id_superior(nombre, apellido)
+      usuario:Usuarios!id_usuario(uid, nombre, apellido, email),
+      superior:Usuarios!id_superior(uid, nombre, apellido)
     `)
     .eq('id_edicion', idEdicion);
   if (error) throw error;
