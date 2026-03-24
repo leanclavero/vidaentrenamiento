@@ -56,3 +56,13 @@ export const updateInscripcion = async (id, updates) => {
   if (error) throw error;
   return data;
 };
+
+// Obtener mis participantes (para Senior/Papisado)
+export const getMisParticipantes = async (idSuperior) => {
+  const { data, error } = await supabase
+    .from('Inscripciones')
+    .select('*, usuario:Usuarios!id_usuario(uid, nombre, apellido, email)')
+    .eq('id_superior', idSuperior);
+  if (error) throw error;
+  return data;
+};

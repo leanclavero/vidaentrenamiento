@@ -90,6 +90,24 @@ export const AuthProvider = ({ children }) => {
     return supabase.auth.signOut();
   };
 
+  const updateProfile = async (updates) => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('Usuarios')
+        .update(updates)
+        .eq('uid', user.id)
+        .select()
+        .single();
+      if (error) throw error;
+      setProfile(prev => ({ ...prev, ...data }));
+      return data;
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      throw err;
+    }
+  };
+
   const value = {
     user,
     profile,
@@ -98,6 +116,7 @@ export const AuthProvider = ({ children }) => {
     registerWithEmail,
     loginWithGoogle,
     logout,
+    updateProfile,
   };
 
   return (

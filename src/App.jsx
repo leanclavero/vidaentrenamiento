@@ -12,6 +12,8 @@ import Metas from './pages/Metas';
 import Declaraciones from './pages/Declaraciones';
 import Aprobaciones from './pages/Aprobaciones';
 import Asignaciones from './pages/Asignaciones';
+import Settings from './pages/Settings';
+import MyParticipants from './pages/MyParticipants';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -49,6 +51,8 @@ function App() {
             <Route path="actions" element={<Declaraciones />} />
             <Route path="approvals" element={<Aprobaciones />} />
             <Route path="assignments" element={<Asignaciones />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="my-participants" element={<MyParticipants />} />
           </Route>
         </Routes>
       </Router>

@@ -1,53 +1,84 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getMisInscripciones } from '../services/inscripcionesService';
+import { getMisInscripciones, getMisParticipantes } from '../services/inscripcionesService';
 import { getMyMetas, createMeta, deleteMeta } from '../services/metasService';
+import { useSearchParams, Link } from 'react-router-dom';
+import { Target, ChevronLeft, User } from 'lucide-react';
 
 const AREAS = ['Personal', 'Relaciones', 'Profesional', 'Comunitario', 'Finanzas', 'Enrolamiento'];
 
 export default function Metas() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const [searchParams] = useSearchParams();
+  const participantUid = searchParams.get('u');
+  
+  const [participants, setParticipants] = useState([]);
+  const [selectedParticipant, setSelectedParticipant] = useState(null);
   const [inscripciones, setInscripciones] = useState([]);
   const [selectedInscripcion, setSelectedInscripcion] = useState(null);
   const [metas, setMetas] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Form
+  // Determine role
+  const role = profile?.rol_global || 'Participante';
+  const isSenior = role !== 'Participante';
+
+  // Form for new meta (only for participants viewing their own)
   const [ejeAdd, setEjeAdd] = useState('Personal');
   const [descAdd, setDescAdd] = useState('');
 
   useEffect(() => {
     if (!user) return;
-    getMisInscripciones(user.id).then(data => {
-      setInscripciones(data);
-      if (data.length > 0) {
-        setSelectedInscripcion(data[0]);
+    
+    const init = async () => {
+      setLoading(true);
+      try {
+        if (isSenior && !participantUid) {
+          // Senior view: list participants
+          const data = await getMisParticipantes(user.id);
+          setParticipants(data || []);
+        } else {
+          // Participant view or Senior viewing a specific participant
+          const targetUid = participantUid || user.id;
+          const data = await getMisInscripciones(targetUid);
+          setInscripciones(data || []);
+          if (data && data.length > 0) {
+            setSelectedInscripcion(data[0]);
+            if (participantUid) {
+              setSelectedParticipant(data[0].usuario);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error in init:", err);
+      } finally {
+        setLoading(false);
       }
-    }).finally(() => setLoading(false));
-  }, [user]);
+    };
+    init();
+  }, [user, participantUid, isSenior]);
 
   useEffect(() => {
-    if (!selectedInscripcion || !user) return;
-    loadMetas();
-  }, [selectedInscripcion, user]);
-
-  const loadMetas = async () => {
-    try {
+    if (!selectedInscripcion) return;
+    const fetchMetas = async () => {
       setLoading(true);
-      const data = await getMyMetas(selectedInscripcion.id_edicion, user.id);
-      setMetas(data || []);
-    } catch (err) {
-      console.error("Error al cargar metas", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        const targetUid = participantUid || user.id;
+        const data = await getMyMetas(selectedInscripcion.id_edicion, targetUid);
+        setMetas(data || []);
+      } catch (err) {
+        console.error("Error fetching metas:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMetas();
+  }, [selectedInscripcion, participantUid, user.id]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!selectedInscripcion || !descAdd.trim()) return;
 
-    // Verificar límite
     const metasEnEje = metas.filter(m => m.eje === ejeAdd);
     if (metasEnEje.length >= 2 && !metasEnEje[0]?.autorizar_metas_extra) {
        alert("No puedes agregar más de 2 metas por área inicialmente sin autorización del staff.");
@@ -63,42 +94,91 @@ export default function Metas() {
         descripcion: descAdd
       });
       setDescAdd('');
-      await loadMetas();
+      // Reload
+      const data = await getMyMetas(selectedInscripcion.id_edicion, user.id);
+      setMetas(data || []);
     } catch (err) {
       alert("Error al guardar meta: " + err.message);
+    } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (metaId) => {
-    if(!window.confirm("¿Seguro que deseas eliminar esta meta? Solo puedes hacerlo si aún no declaraste acciones sobre ella.")) return;
+    if(!window.confirm("¿Seguro que deseas eliminar esta meta?")) return;
     try {
       setLoading(true);
       await deleteMeta(metaId);
-      await loadMetas();
+      setMetas(prev => prev.filter(m => m.id !== metaId));
     } catch (err) {
       alert("Error al eliminar meta: " + err.message);
+    } finally {
       setLoading(false);
     }
+  };
+
+  if (loading && participants.length === 0 && inscripciones.length === 0) {
+    return <div style={{ padding: '2rem' }}>Cargando...</div>;
   }
 
-  if (loading && inscripciones.length === 0) return <div style={{padding:'2rem'}}>Cargando perfil...</div>;
-
-  if (inscripciones.length === 0) {
+  // View 1: Senior listing their participants
+  if (isSenior && !participantUid) {
     return (
       <div>
-        <div className="card">
-          <h4>No tienes Ediciones Asignadas</h4>
-          <p style={{color: 'var(--text-muted)'}}>Debes solicitar un link de invitación para unirte a una Edición y comenzar a cargar tus metas.</p>
-        </div>
+        <h2 style={{ marginBottom: '2rem' }}>Metas de Participantes</h2>
+        {participants.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+            <p style={{ color: 'var(--text-muted)' }}>No tienes participantes asignados para ver sus metas.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+            {participants.map(ins => {
+              const p = ins.usuario;
+              const name = p.nombre && p.nombre !== 'Usuario' ? `${p.nombre} ${p.apellido}` : p.email.split('@')[0];
+              return (
+                <Link key={ins.id} to={`?u=${p.uid}`} className="card" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '1rem', transition: 'transform 0.2s' }}>
+                  <div className="avatar">{name.substring(0, 2).toUpperCase()}</div>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ margin: 0, color: 'var(--text-main)' }}>{name}</h4>
+                    <small style={{ color: 'var(--text-muted)' }}>{p.email}</small>
+                  </div>
+                  <Target size={20} color="var(--primary-color)" />
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }
 
+  // View 2: Empty state for participants
+  if (!loading && inscripciones.length === 0) {
+    return (
+      <div className="card">
+        <h4>No se encontraron ediciones</h4>
+        <p style={{ color: 'var(--text-muted)' }}>Este usuario no está inscrito en ninguna edición activa.</p>
+        {isSenior && <Link to="/goals" className="btn btn-secondary" style={{ marginTop: '1rem', display: 'inline-block' }}>Volver</Link>}
+      </div>
+    );
+  }
+
+  // View 3: Goals display (own or participant's)
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h2>Mis Metas</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {participantUid && (
+            <Link to="/goals" className="btn btn-secondary" style={{ padding: '0.5rem', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ChevronLeft size={20} />
+            </Link>
+          )}
+          <div>
+            <h2 style={{ margin: 0 }}>{participantUid ? `Metas de ${selectedParticipant?.nombre || 'Participante'}` : 'Mis Metas'}</h2>
+            {participantUid && <small style={{ color: 'var(--text-muted)' }}>{selectedParticipant?.email}</small>}
+          </div>
+        </div>
+        
         {inscripciones.length > 1 && (
           <select 
             value={selectedInscripcion?.id} 
@@ -112,34 +192,37 @@ export default function Metas() {
         )}
       </div>
 
-      <form onSubmit={handleCreate} className="card" style={{ marginBottom: '2rem' }}>
-        <h4>Nueva Meta</h4>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end', marginTop: '1rem' }}>
-          <div className="form-group" style={{ flex: '1 1 200px', marginBottom: 0 }}>
-            <label>Área Requerida</label>
-            <select value={ejeAdd} onChange={e => setEjeAdd(e.target.value)} required style={{width: '100%', padding:'0.75rem', background:'rgba(0,0,0,0.2)', color:'white', borderRadius:'0.5rem', border:'1px solid var(--border-color)'}}>
-              {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
+      {!participantUid && (
+        <form onSubmit={handleCreate} className="card" style={{ marginBottom: '2rem' }}>
+          <h4>Nueva Meta</h4>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end', marginTop: '1rem' }}>
+            <div className="form-group" style={{ flex: '1 1 200px', marginBottom: 0 }}>
+              <label>Área Requerida</label>
+              <select value={ejeAdd} onChange={e => setEjeAdd(e.target.value)} required 
+                style={{ width: '100%', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', color: 'white', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>
+                {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+            <div className="form-group" style={{ flex: '2 1 300px', marginBottom: 0 }}>
+              <label>Descripción de la Meta</label>
+              <input type="text" value={descAdd} onChange={e => setDescAdd(e.target.value)} required placeholder="Ej. Bajar 5 kilos este mes" />
+            </div>
+            <button type="submit" className="btn btn-primary" style={{ flex: '0 0 auto', width: 'auto' }} disabled={loading}>
+              {loading ? '...' : '+ Agregar'}
+            </button>
           </div>
-          <div className="form-group" style={{ flex: '2 1 300px', marginBottom: 0 }}>
-            <label>Descripción de la Meta</label>
-            <input type="text" value={descAdd} onChange={e => setDescAdd(e.target.value)} required placeholder="Ej. Bajar 5 kilos este mes" />
-          </div>
-          <button type="submit" className="btn btn-primary" style={{ flex: '0 0 auto', width: 'auto' }} disabled={loading}>
-            {loading ? '...' : '+ Agregar'}
-          </button>
-        </div>
-      </form>
+        </form>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
         {AREAS.map(area => {
           const areaMetas = metas.filter(m => m.eje === area);
           const maxReached = areaMetas.length >= 2 && (!areaMetas[0]?.autorizar_metas_extra);
           return (
-            <div key={area} className="card" style={{ marginBottom: 0, padding: '1.25rem', border: maxReached ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border-color)' }}>
+            <div key={area} className="card" style={{ marginBottom: 0, padding: '1.25rem', border: (maxReached && !participantUid) ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border-color)' }}>
               <h4 style={{ color: 'var(--primary-color)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {area} 
-                <span style={{fontSize:'0.75rem', padding: '0.2rem 0.5rem', borderRadius: '1rem', background: 'rgba(255,255,255,0.05)', color:'var(--text-muted)'}}>
+                <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '1rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
                   {areaMetas.length}/2
                 </span>
               </h4>
@@ -149,17 +232,19 @@ export default function Metas() {
                 ) : (
                   areaMetas.map((meta, idx) => (
                     <li key={meta.id} style={{ marginBottom: '0.75rem', fontSize: '0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', background: 'rgba(0,0,0,0.15)', padding: '0.75rem', borderRadius: '0.5rem' }}>
-                      <div style={{flex: 1}}>
-                        <strong style={{color: 'var(--text-muted)', marginRight: '0.5rem'}}>{idx + 1}.</strong> 
+                      <div style={{ flex: 1 }}>
+                        <strong style={{ color: 'var(--text-muted)', marginRight: '0.5rem' }}>{idx + 1}.</strong> 
                         {meta.descripcion}
                       </div>
-                      <button onClick={()=>handleDelete(meta.id)} style={{background:'transparent', color:'var(--error-color)', border:'none', cursor:'pointer', padding: '0.2rem', opacity: 0.7}} title="Eliminar meta">✕</button>
+                      {!participantUid && (
+                        <button onClick={() => handleDelete(meta.id)} style={{ background: 'transparent', color: 'var(--error-color)', border: 'none', cursor: 'pointer', padding: '0.2rem', opacity: 0.7 }} title="Eliminar meta">✕</button>
+                      )}
                     </li>
                   ))
                 )}
               </ul>
             </div>
-          )
+          );
         })}
       </div>
     </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { NavLink, useNavigate, Outlet } from 'react-router-dom';
-import { LogOut, Home, Users, Target, Calendar, CheckSquare, ShieldCheck, UserPlus } from 'lucide-react';
+import { LogOut, Home, Users, Target, Calendar, CheckSquare, ShieldCheck, UserPlus, Settings, UserCheck } from 'lucide-react';
 
 export default function Layout() {
   const { user, profile, logout } = useAuth();
@@ -72,13 +72,30 @@ export default function Layout() {
           <li>
             <NavLink to="/goals">
               <Target size={20} />
-              <span>Mis Metas</span>
+              <span>{role === 'Senior' || role === 'Papisado' ? 'Metas de Participantes' : 'Mis Metas'}</span>
             </NavLink>
           </li>
+          
+          {(role === 'Senior' || role === 'Papisado') && (
+            <li>
+              <NavLink to="/my-participants">
+                <UserCheck size={20} />
+                <span>Mis Participantes</span>
+              </NavLink>
+            </li>
+          )}
+
           <li>
             <NavLink to="/actions">
               <CheckSquare size={20} />
               <span>Mis Acciones</span>
+            </NavLink>
+          </li>
+
+          <li style={{ marginTop: 'auto' }}>
+            <NavLink to="/settings">
+              <Settings size={20} />
+              <span>Ajustes</span>
             </NavLink>
           </li>
         </ul>
