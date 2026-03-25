@@ -57,9 +57,10 @@ export const getParticipantsCount = async (idEdicion) => {
 export const getPendingAssignmentsCount = async () => {
   const { data, error } = await supabase
     .from('Usuarios')
-    .select('uid, Inscripciones(id)');
+    .select('uid, Inscripciones!id_usuario(id)');
     
   if (error) throw error;
+
   
   // Filtramos los que tienen el array de inscripciones vacío
   const pending = data.filter(u => !u.Inscripciones || u.Inscripciones.length === 0);

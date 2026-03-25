@@ -57,9 +57,10 @@ export const getDeclaracionesPendientes = async () => {
     .from('Declaraciones')
     .select(`
       *,
-      usuario:Metas!id_meta(id_usuario)
+      meta:Metas!id_meta(id_usuario)
     `)
     .eq('estado_validacion', 'Pendiente');
+
     
   if (error) throw error;
   return data;
