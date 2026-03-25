@@ -1,13 +1,18 @@
+// v1.1 - Added Goals Approval Stats for Staff
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getEvidenciasPendientes } from '../services/evidenciasService';
+import { getMetasPendientes } from '../services/metasService';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
-  const [pendingCount, setPendingCount] = useState(0);
+  const [eviCount, setEviCount] = useState(0);
+  const [metasCount, setMetasCount] = useState(0);
+  const [metasUsersCount, setMetasUsersCount] = useState(0);
   const [loading, setLoading] = useState(false);
   
   const role = profile?.rol_global || 'Participante';
+  const isStaff = ['Owner', 'Admin', 'Coach', 'Coordinador'].includes(role);
 
   useEffect(() => {
     if (!user || role === 'Participante') return;
@@ -15,8 +20,17 @@ export default function Dashboard() {
     const fetchStats = async () => {
       setLoading(true);
       try {
-        const data = await getEvidenciasPendientes();
-        setPendingCount(data?.length || 0);
+        // Evidencias
+        const eviData = await getEvidenciasPendientes();
+        setEviCount(eviData?.length || 0);
+
+        // Metas (only for higher staff)
+        if (isStaff) {
+          const metasData = await getMetasPendientes();
+          setMetasCount(metasData?.length || 0);
+          const uniqueUsers = new Set(metasData?.map(m => m.id_usuario));
+          setMetasUsersCount(uniqueUsers.size);
+        }
       } catch (err) {
         console.error("Error fetching stats:", err);
       } finally {
@@ -25,7 +39,7 @@ export default function Dashboard() {
     };
 
     fetchStats();
-  }, [user, role]);
+  }, [user, role, isStaff]);
 
   return (
     <div>
@@ -48,18 +62,27 @@ export default function Dashboard() {
           <h4>Evidencias por Aprobar</h4>
           <p>
             {loading ? 'Cargando estadísticas...' : (
-              pendingCount > 0 
-                ? `Tienes ${pendingCount} evidencias pendientes de tu equipo asignado.`
+              eviCount > 0 
+                ? `Tienes ${eviCount} evidencias pendientes de tu equipo asignado.`
                 : 'No tienes evidencias pendientes por revisar. ¡Gran trabajo!'
             )}
           </p>
         </div>
       )}
       
-      {(role === 'Coach' || role === 'Coordinador' || role === 'Admin' || role === 'Owner') && (
+      {isStaff && (
         <div className="card">
           <h4>Estadísticas de la Edición</h4>
-          <p>Hay {pendingCount} evidencias pendientes de validación en total.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '0.5rem' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>{eviCount}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Evidencias pendientes</div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '0.5rem' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fbbf24' }}>{metasCount}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Metas de {metasUsersCount} participantes por aprobar</div>
+            </div>
+          </div>
         </div>
       )}
     </div>
