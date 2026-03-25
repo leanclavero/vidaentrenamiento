@@ -1,18 +1,16 @@
-// v1.2 - Added Image Compression, Axis labels, and Full Spanish translation
+// v1.3 - Staff Mass View for Actions
 import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getMisInscripciones, getMisParticipantes } from '../services/inscripcionesService';
+import { getMisInscripciones, getMisParticipantes, getInscripciones } from '../services/inscripcionesService';
 import { getMyMetas } from '../services/metasService';
 import { getMyDeclaraciones, createDeclaracion } from '../services/declaracionesService';
 import { uploadEvidencia } from '../services/evidenciasService';
 import { useSearchParams, Link } from 'react-router-dom';
 import { ChevronLeft, CheckSquare, Upload, FileText } from 'lucide-react';
 
-// Helper for image compression to ~100kb
 const compressImage = (file, maxKB = 100) => {
   return new Promise((resolve) => {
     if (!file || !file.type.startsWith('image/')) return resolve(file);
-    
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
@@ -22,41 +20,22 @@ const compressImage = (file, maxKB = 100) => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        
-        // Max dimension ~1200px for reasonable quality vs size
         const maxDim = 1200;
-        if (width > height) {
-          if (width > maxDim) {
-            height *= maxDim / width;
-            width = maxDim;
-          }
-        } else {
-          if (height > maxDim) {
-            width *= maxDim / height;
-            height = maxDim;
-          }
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
+        if (width > height) { if (width > maxDim) { height *= maxDim / width; width = maxDim; } }
+        else { if (height > maxDim) { width *= maxDim / height; height = maxDim; } }
+        canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
-        
         let quality = 0.7;
         let dataUrl = canvas.toDataURL('image/jpeg', quality);
-        
-        // Iterate quality to reach target size
         while (dataUrl.length > maxKB * 1024 * 1.33 && quality > 0.1) {
           quality -= 0.1;
           dataUrl = canvas.toDataURL('image/jpeg', quality);
         }
-        
-        fetch(dataUrl)
-          .then(res => res.blob())
-          .then(blob => {
-            const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: 'image/jpeg' });
-            resolve(newFile);
-          });
+        fetch(dataUrl).then(res => res.blob()).then(blob => {
+          const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: 'image/jpeg' });
+          resolve(newFile);
+        });
       };
     };
   });
@@ -75,9 +54,10 @@ export default function Declaraciones() {
   const [declaraciones, setDeclaraciones] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Determine role
+  // Determine roles
   const role = profile?.rol_global || 'Participante';
-  const isSenior = role !== 'Participante';
+  const isStaff = ['Owner', 'Admin', 'Coach', 'Coordinador'].includes(role);
+  const isSuperior = role !== 'Participante';
 
   // Declaracion Form
   const [semana, setSemana] = useState(1);
@@ -98,16 +78,26 @@ export default function Declaraciones() {
     const init = async () => {
       setLoading(true);
       try {
-        if (isSenior && !participantUid) {
-          const data = await getMisParticipantes(user.id);
-          setParticipants(data || []);
-        } else {
-          const targetUid = participantUid || user.id;
-          const data = await getMisInscripciones(targetUid);
-          setInscripciones(data || []);
-          if (data && data.length > 0) {
-            setSelectedInscripcion(data[0]);
-            if (participantUid) setSelectedParticipant(data[0].usuario);
+        const myIns = await getMisInscripciones(user.id);
+        setInscripciones(myIns || []);
+        
+        if (myIns && myIns.length > 0) {
+          const currentIns = myIns[0];
+          setSelectedInscripcion(currentIns);
+
+          if (isSuperior && !participantUid) {
+            if (isStaff) {
+              const allParticipants = await getInscripciones(currentIns.id_edicion);
+              setParticipants(allParticipants?.filter(p => p.rol === 'Participante') || []);
+            } else {
+              const assigned = await getMisParticipantes(user.id);
+              setParticipants(assigned || []);
+            }
+          } else if (participantUid) {
+            const targetIns = await getMisInscripciones(participantUid);
+            if (targetIns && targetIns.length > 0) {
+              setSelectedParticipant(targetIns[0].usuario);
+            }
           }
         }
       } catch (err) {
@@ -117,7 +107,7 @@ export default function Declaraciones() {
       }
     };
     init();
-  }, [user, participantUid, isSenior]);
+  }, [user, participantUid, isSuperior, isStaff]);
 
   useEffect(() => {
     if (!selectedInscripcion || !user) return;
@@ -142,7 +132,6 @@ export default function Declaraciones() {
   const handleCreateDec = async (e) => {
     e.preventDefault();
     if (!metaSel || !compromiso.trim() || participantUid) return;
-
     try {
       setLoading(true);
       await createDeclaracion({
@@ -152,9 +141,7 @@ export default function Declaraciones() {
         tipo_evidencia: tipoEvi
       });
       setCompromiso('');
-      
-      const targetUid = participantUid || user.id;
-      const decData = await getMyDeclaraciones(selectedInscripcion.id_edicion, targetUid);
+      const decData = await getMyDeclaraciones(selectedInscripcion.id_edicion, user.id);
       setDeclaraciones(decData || []);
     } catch (err) {
       alert("Error al declarar: " + err.message);
@@ -168,18 +155,11 @@ export default function Declaraciones() {
     if (!eviActiveId || !eviFile || participantUid) return;
     try {
       setUploading(true);
-      
-      // Compress before upload
       const compressedFile = await compressImage(eviFile, 100);
-      
       await uploadEvidencia(eviActiveId, compressedFile, eviComment);
       alert("Evidencia subida correctamente y enviada a revisión.");
-      setEviActiveId(null);
-      setEviFile(null);
-      setEviComment('');
-      
-      const targetUid = participantUid || user.id;
-      const decData = await getMyDeclaraciones(selectedInscripcion.id_edicion, targetUid);
+      setEviActiveId(null); setEviFile(null); setEviComment('');
+      const decData = await getMyDeclaraciones(selectedInscripcion.id_edicion, user.id);
       setDeclaraciones(decData || []);
     } catch (err) {
       alert("Error al subir evidencia: " + err.message);
@@ -188,26 +168,26 @@ export default function Declaraciones() {
     }
   };
 
-  if (loading && participants.length === 0 && inscripciones.length === 0) {
+  if (loading && participants.length === 0 && (participantUid ? !selectedParticipant : true) && inscripciones.length === 0) {
     return <div style={{ padding: '2rem' }}>Cargando...</div>;
   }
 
-  if (isSenior && !participantUid) {
+  if (isSuperior && !participantUid) {
     return (
       <div>
-        <h2 style={{ marginBottom: '2rem' }}>Acciones de Participantes</h2>
+        <h2 style={{ marginBottom: '2rem' }}>{isStaff ? 'Acciones de los Participantes' : 'Mis Participantes'}</h2>
         {participants.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <p style={{ color: 'var(--text-muted)' }}>No tienes participantes asignados.</p>
+            <p style={{ color: 'var(--text-muted)' }}>No se encontraron participantes.</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
             {participants.map(ins => {
               const p = ins.usuario;
-              const name = p.nombre && p.nombre !== 'Usuario' ? `${p.nombre} ${p.apellido}` : p.email.split('@')[0];
+              const name = p.nombre ? `${p.nombre} ${p.apellido}` : p.email.split('@')[0];
               return (
-                <Link key={ins.id} to={`?u=${p.uid}`} className="card" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '1rem', transition: 'transform 0.2s' }}>
-                  <div className="avatar">{name.substring(0, 2).toUpperCase()}</div>
+                <Link key={ins.id} to={`?u=${p.uid}`} className="card" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div className="avatar" style={{ background: 'var(--primary-color)' }}>{name.substring(0, 2).toUpperCase()}</div>
                   <div style={{ flex: 1 }}>
                     <h4 style={{ margin: 0, color: 'var(--text-main)' }}>{name}</h4>
                     <small style={{ color: 'var(--text-muted)' }}>{p.email}</small>
@@ -222,22 +202,12 @@ export default function Declaraciones() {
     );
   }
 
-  if (!loading && inscripciones.length === 0) {
-    return (
-      <div className="card">
-        <h4>No se encontraron ediciones</h4>
-        <p style={{ color: 'var(--text-muted)' }}>No estás inscrito en ninguna edición activa.</p>
-        {isSenior && <Link to="/actions" className="btn btn-secondary" style={{ marginTop: '1rem', display: 'inline-block' }}>Volver</Link>}
-      </div>
-    );
-  }
-
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {participantUid && (
-            <Link to="/actions" className="btn btn-secondary" style={{ padding: '0.5rem', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Link to="/actions" className="card" style={{ padding: '0.5rem', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom:0 }}>
               <ChevronLeft size={20} />
             </Link>
           )}
@@ -269,18 +239,16 @@ export default function Declaraciones() {
               </div>
               <div className="form-group" style={{ flex: '3 1 300px', marginBottom: 0 }}>
                 <label>Acción / Compromiso</label>
-                <input type="text" value={compromiso} onChange={e => setCompromiso(e.target.value)} required placeholder="Ej. Ir al gimnasio" />
+                <input type="text" value={compromiso} onChange={e => setCompromiso(e.target.value)} required />
               </div>
               <div className="form-group" style={{ flex: '1 1 150px', marginBottom: 0 }}>
                 <label>Ejecución</label>
-                <select value={tipoEvi} onChange={e => setTipoEvi(e.target.value)} required style={{width: '100%', padding:'0.75rem', background:'rgba(0,0,0,0.2)', color:'white', borderRadius:'0.5rem', border:'1px solid var(--border-color)'}}>
+                <select value={tipoEvi} onChange={e => setTipoEvi(e.target.value)} required>
                   <option value="única vez">1 vez</option>
                   <option value="múltiples veces">Varias veces</option>
                 </select>
               </div>
-              <button type="submit" className="btn btn-primary" style={{ flex: '0 0 auto', width: 'auto' }} disabled={loading}>
-                {loading ? '...' : '+ Declarar'}
-              </button>
+              <button type="submit" className="btn btn-primary" style={{ width: 'auto' }}>+ Declarar</button>
             </div>
           </form>
         )
@@ -296,71 +264,51 @@ export default function Declaraciones() {
             <div key={dec.id_declaracion} className="card" style={{ marginBottom: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{color:'var(--primary-color)', fontWeight:'bold'}}>Semana {dec.semana_nro}</span>
-                <span style={{fontSize:'0.8rem', padding:'0.2rem 0.6rem', borderRadius:'1rem', background: dec.estado_validacion === 'Aprobado' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.05)'}}>
-                  {dec.estado_validacion === 'Pendiente' ? 'Pendiente' : (dec.estado_validacion === 'Aprobado' ? 'Aprobado' : 'Rechazado')}
+                <span style={{fontSize:'0.8rem', padding:'0.2rem 0.6rem', borderRadius:'1rem', background: 'rgba(255,255,255,0.05)'}}>
+                  {dec.estado_validacion || 'Pendiente'}
                 </span>
               </div>
               <p style={{ marginTop:'0.5rem', fontWeight:'500'}}>{dec.descripcion_compromiso}</p>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                 Meta Asociada: {meta ? `[${meta.eje}] ${meta.titulo || meta.descripcion.substring(0,30)}` : 'Desconocida'}
               </p>
-              <hr style={{ borderColor: 'var(--border-color)', margin: '1rem 0', opacity: 0.5 }} />
               
               {eviActiveId === dec.id_declaracion ? (
-                <form onSubmit={handleUploadEvi} style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '0.5rem' }}>
+                <form onSubmit={handleUploadEvi} style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '0.5rem', marginTop: '1rem' }}>
                   <div className="form-group">
-                    <label style={{ display: 'block', marginBottom: '0.5rem' }}>Adjuntar Foto (Máx 100kb auto-ajustado)</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      <label className="btn btn-secondary" style={{ flex: '0 0 auto', margin: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Upload size={16} />
-                        {eviFile ? 'Cambiar Foto' : 'Seleccionar Foto'}
-                        <input type="file" ref={fileInputRef} onChange={e => setEviFile(e.target.files[0])} accept="image/*" style={{ display: 'none' }} />
-                      </label>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {eviFile ? eviFile.name : 'Ningún archivo seleccionado'}
-                      </span>
-                    </div>
+                    <label>Adjuntar Foto</label>
+                    <input type="file" ref={fileInputRef} onChange={e => setEviFile(e.target.files[0])} accept="image/*" />
                   </div>
                   <div className="form-group">
-                    <label>Comentario (Opcional)</label>
-                    <input type="text" value={eviComment} onChange={e => setEviComment(e.target.value)} placeholder="Ej. ¡Misión cumplida!" />
+                    <label>Comentario</label>
+                    <input type="text" value={eviComment} onChange={e => setEviComment(e.target.value)} />
                   </div>
                   <div style={{display:'flex', gap:'0.5rem'}}>
-                    <button type="submit" className="btn btn-primary" disabled={uploading || !eviFile}>{uploading ? 'Procesando...' : 'Enviar Evidencia'}</button>
-                    <button type="button" className="btn btn-secondary" onClick={()=>setEviActiveId(null)} disabled={uploading}>Cancelar</button>
+                    <button type="submit" className="btn btn-primary" disabled={uploading}>{uploading ? 'Procesando...' : 'Enviar'}</button>
+                    <button type="button" className="btn btn-secondary" onClick={()=>setEviActiveId(null)}>Cancelar</button>
                   </div>
                 </form>
               ) : (
                 <div>
                    {eviReciente && (
-                      <div style={{marginBottom:'1rem', fontSize:'0.85rem', background:'rgba(255,255,255,0.02)', padding:'0.75rem', borderRadius:'0.5rem'}}>
-                        <div style={{color:'var(--text-muted)', marginBottom:'0.25rem'}}>Última evidencia ({eviReciente.estado_validacion}):</div>
+                      <div style={{marginTop:'1rem', fontSize:'0.85rem', background:'rgba(255,255,255,0.02)', padding:'0.75rem', borderRadius:'0.5rem'}}>
+                        <div style={{color:'var(--text-muted)', marginBottom:'0.25rem'}}>Última evidencia:</div>
                         {eviReciente.url_foto_evidencia ? <a href={eviReciente.url_foto_evidencia} target="_blank" rel="noreferrer" style={{color:'var(--primary-color)', display: 'flex', alignItems: 'center', gap: '0.4rem'}}>
-                          <FileText size={14} /> Ver archivo subido
+                           Ver archivo
                         </a> : <span>Archivo en proceso</span>}
-                        {eviReciente.comentario_participante && <div style={{fontStyle:'italic', marginTop:'0.25rem'}}>"{eviReciente.comentario_participante}"</div>}
                       </div>
                    )}
                    {(!participantUid && dec.estado_validacion !== 'Aprobado') && (
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <span style={{fontSize:'0.8rem', color:'var(--text-muted)', fontWeight: 'bold'}}>
-                         {dec.tipo_evidencia === 'única vez' ? '1 vez' : 'Varias veces'}
-                       </span>
-                       <button onClick={()=>setEviActiveId(dec.id_declaracion)} className="btn btn-secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.8rem', border:'1px solid var(--primary-color)', color:'var(--primary-color)' }}>
-                         + Subir Foto
-                       </button>
-                     </div>
+                     <button onClick={()=>setEviActiveId(dec.id_declaracion)} className="btn btn-secondary" style={{ marginTop: '1rem', fontSize:'0.8rem' }}>
+                       + Subir Foto
+                     </button>
                    )}
                 </div>
               )}
             </div>
            )
         })}
-        {declaraciones.length === 0 && (
-          <p style={{ color: 'var(--text-muted)', gridColumn: '1 / -1' }}>No hay acciones declaradas aún.</p>
-        )}
       </div>
     </div>
   );
 }
-
