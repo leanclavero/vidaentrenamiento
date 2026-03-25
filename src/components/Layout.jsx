@@ -1,4 +1,4 @@
-// v1.3.1 - Sidebar Reordered, Renamed & Triple Badges
+// v1.3.2 - Added Assignment Badges for Admin
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom';
@@ -6,6 +6,7 @@ import { LogOut, Home, Users, Target, Calendar, CheckSquare, ShieldCheck, UserPl
 import { getEvidenciasPendientes } from '../services/evidenciasService';
 import { getMetasPendientes } from '../services/metasService';
 import { getDeclaracionesPendientes } from '../services/declaracionesService';
+import { getPendingAssignmentsCount } from '../services/asignacionesService';
 
 export default function Layout() {
   const { user, profile, logout } = useAuth();
@@ -14,6 +15,7 @@ export default function Layout() {
   const [pendingEvi, setPendingEvi] = useState(0);
   const [pendingMetas, setPendingMetas] = useState(0);
   const [pendingDec, setPendingDec] = useState(0);
+  const [pendingAssign, setPendingAssign] = useState(0);
 
   const handleLogout = async () => {
     await logout();
@@ -23,27 +25,37 @@ export default function Layout() {
   const role = profile?.rol_global || 'Participante';
   const isStaff = ['Owner', 'Admin', 'Coach', 'Coordinador'].includes(role);
   const isSenior = ['Senior', 'Papisado'].includes(role);
+  const isAdminOrOwner = ['Owner', 'Admin'].includes(role);
 
   useEffect(() => {
     if (!user || role === 'Participante') return;
 
     const fetchAllPending = async () => {
       try {
-        const [eviData, metasData, decData] = await Promise.all([
+        const promises = [
           getEvidenciasPendientes(),
           getMetasPendientes(),
           getDeclaracionesPendientes()
-        ]);
-        setPendingEvi(eviData?.length || 0);
-        setPendingMetas(metasData?.length || 0);
-        setPendingDec(decData?.length || 0);
+        ];
+        
+        if (isAdminOrOwner) {
+          promises.push(getPendingAssignmentsCount());
+        }
+
+        const results = await Promise.all(promises);
+        setPendingEvi(results[0]?.length || 0);
+        setPendingMetas(results[1]?.length || 0);
+        setPendingDec(results[2]?.length || 0);
+        if (isAdminOrOwner) {
+          setPendingAssign(results[3] || 0);
+        }
       } catch (err) {
         console.error("Sidebar counts error:", err);
       }
     };
 
     fetchAllPending();
-  }, [user, role, location.pathname]);
+  }, [user, role, location.pathname, isAdminOrOwner]);
 
   return (
     <div className="layout-container">
@@ -72,12 +84,13 @@ export default function Layout() {
             </li>
           )}
 
-          {/* Special: Asignaciones (Admin/Owner only) */}
-          {(role === 'Owner' || role === 'Admin') && (
+          {/* Special: Asignaciones (Admin/Owner only) - Priority Badge */}
+          {(isAdminOrOwner) && (
             <li>
               <NavLink to="/assignments">
                 <UserPlus size={20} />
                 <span>Asignaciones</span>
+                {pendingAssign > 0 && <span className="nav-badge" style={{ background: '#f59e0b' }}>{pendingAssign}</span>}
               </NavLink>
             </li>
           )}
@@ -111,7 +124,7 @@ export default function Layout() {
             </NavLink>
           </li>
 
-          {/* 5. Declaraciones (formerly Acciones) */}
+          {/* 5. Declaraciones */}
           <li>
             <NavLink to="/actions">
               <CheckSquare size={20} />
@@ -122,7 +135,7 @@ export default function Layout() {
             </NavLink>
           </li>
 
-          {/* 6. Evidencias (formerly Validar Evidencias) */}
+          {/* 6. Evidencias */}
           {(role !== 'Participante') && (
             <li>
               <NavLink to="/approvals">

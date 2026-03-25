@@ -1,11 +1,12 @@
-// v1.2 - Reordered metrics & Clickable Cards
+// v1.3.1 - Priority Admin Alerts for Assignments
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { getEvidenciasPendientes } from '../services/evidenciasService';
 import { getMetasPendientes } from '../services/metasService';
-import { getParticipantsCount } from '../services/asignacionesService';
-import { getDeclaracionesCount } from '../services/declaracionesService';
+import { getParticipantsCount, getPendingAssignmentsCount } from '../services/asignacionesService';
+import { getDeclaracionesCount, getDeclaracionesPendientes } from '../services/declaracionesService';
+import { AlertCircle, ArrowRight } from 'lucide-react';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -14,13 +15,15 @@ export default function Dashboard() {
     metas: 0,
     declaraciones: 0,
     evidencias: 0,
-    metasUsers: 0
+    metasUsers: 0,
+    pendingAssign: 0
   });
   const [loading, setLoading] = useState(false);
   
   const role = profile?.rol_global || 'Participante';
   const isStaff = ['Owner', 'Admin', 'Coach', 'Coordinador'].includes(role);
   const isSenior = ['Senior', 'Papisado'].includes(role);
+  const isAdminOrOwner = ['Owner', 'Admin'].includes(role);
 
   useEffect(() => {
     if (!user || role === 'Participante') return;
@@ -28,12 +31,19 @@ export default function Dashboard() {
     const fetchStats = async () => {
       setLoading(true);
       try {
-        const [pCount, mData, dCount, eData] = await Promise.all([
+        const promises = [
           getParticipantsCount(),
           getMetasPendientes(),
           getDeclaracionesCount(),
-          getEvidenciasPendientes()
-        ]);
+          getEvidenciasPendientes(),
+          getDeclaracionesPendientes()
+        ];
+        
+        if (isAdminOrOwner) {
+          promises.push(getPendingAssignmentsCount());
+        }
+
+        const [pCount, mData, dCount, eData, decPend, assignCount] = await Promise.all(promises);
 
         const uniqueMetasUsers = new Set(mData?.map(m => m.id_usuario)).size;
 
@@ -42,7 +52,8 @@ export default function Dashboard() {
           metas: mData?.length || 0,
           declaraciones: dCount || 0,
           evidencias: eData?.length || 0,
-          metasUsers: uniqueMetasUsers
+          metasUsers: uniqueMetasUsers,
+          pendingAssign: assignCount || 0
         });
       } catch (err) {
         console.error("Error fetching stats:", err);
@@ -52,7 +63,7 @@ export default function Dashboard() {
     };
 
     fetchStats();
-  }, [user, role]);
+  }, [user, role, isAdminOrOwner]);
 
   return (
     <div>
@@ -62,6 +73,23 @@ export default function Dashboard() {
         <h4>¡Hola, {profile?.nombre || user?.email}!</h4>
         <p>Tu rol de acceso global actual es: <strong>{role}</strong></p>
       </div>
+
+      {isAdminOrOwner && stats.pendingAssign > 0 && (
+        <Link to="/assignments" style={{ textDecoration: 'none' }}>
+          <div className="card" style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid #f59e0b', display: 'flex', alignItems: 'center', gap: '1rem', animation: 'pulse 2s infinite' }}>
+            <div style={{ background: '#f59e0b', padding: '0.75rem', borderRadius: '50%', color: 'white' }}>
+              <AlertCircle size={24} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <h4 style={{ color: '#f59e0b', margin: 0 }}>Acción Prioritaria</h4>
+              <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-main)' }}>
+                Hay <strong>{stats.pendingAssign}</strong> usuarios registrados pendientes de asignación a una edición.
+              </p>
+            </div>
+            <ArrowRight size={20} color="#f59e0b" />
+          </div>
+        </Link>
+      )}
       
       {role === 'Participante' && (
         <div className="card">
@@ -78,7 +106,6 @@ export default function Dashboard() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
               
-              {/* 1. Participantes */}
               <Link to={isStaff ? "/team" : "/my-participants"} style={{ textDecoration: 'none' }}>
                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid var(--border-color)', transition: 'transform 0.2s', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.02)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'}>
                   <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#10b981' }}>{stats.participants}</div>
@@ -86,7 +113,6 @@ export default function Dashboard() {
                 </div>
               </Link>
 
-              {/* 2. Metas */}
               <Link to="/goals" style={{ textDecoration: 'none' }}>
                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid var(--border-color)', transition: 'transform 0.2s' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.02)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'}>
                   <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#fbbf24' }}>{stats.metas}</div>
@@ -96,15 +122,13 @@ export default function Dashboard() {
                 </div>
               </Link>
 
-              {/* 3. Declaraciones */}
               <Link to="/actions" style={{ textDecoration: 'none' }}>
                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid var(--border-color)', transition: 'transform 0.2s' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.02)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'}>
                   <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#6366f1' }}>{stats.declaraciones}</div>
-                  <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Declaraciones (Acciones)</div>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Declaraciones</div>
                 </div>
               </Link>
 
-              {/* 4. Evidencias */}
               <Link to="/approvals" style={{ textDecoration: 'none' }}>
                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid var(--border-color)', transition: 'transform 0.2s' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.02)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'}>
                   <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#ef4444' }}>{stats.evidencias}</div>
@@ -116,6 +140,13 @@ export default function Dashboard() {
           )}
         </div>
       )}
+      <style>{`
+        @keyframes pulse {
+          0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+          70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+      `}</style>
     </div>
   );
 }

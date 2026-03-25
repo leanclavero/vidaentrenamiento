@@ -53,3 +53,17 @@ export const getParticipantsCount = async (idEdicion) => {
   return count || 0;
 };
 
+// Obtener cantidad de usuarios sin ninguna inscripción (pendientes de asignación)
+export const getPendingAssignmentsCount = async () => {
+  const { data, error } = await supabase
+    .from('Usuarios')
+    .select('uid, Inscripciones(id)');
+    
+  if (error) throw error;
+  
+  // Filtramos los que tienen el array de inscripciones vacío
+  const pending = data.filter(u => !u.Inscripciones || u.Inscripciones.length === 0);
+  return pending.length;
+};
+
+
