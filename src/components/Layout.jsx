@@ -12,7 +12,7 @@ export default function Layout() {
     navigate('/login');
   };
 
-  // Determine user role (this will eventually come from Inscripciones per edition)
+  // Determine user role (now normalized in AuthContext)
   const role = profile?.rol_global || 'Participante';
 
   return (
@@ -31,7 +31,7 @@ export default function Layout() {
           </li>
           
           {/* Menu for Owners/Admins specifically */}
-          {(profile?.rol_global === 'Owner' || profile?.rol_global === 'Admin') && (
+          {(role === 'Owner' || role === 'Admin') && (
             <li>
               <NavLink to="/assignments">
                 <UserPlus size={20} />
@@ -52,20 +52,31 @@ export default function Layout() {
 
           {/* Validation menu for Staff (Seniors/Papisados/Admins/Coaches) */}
           {(role !== 'Participante') && (
-            <>
-              <li>
-                <NavLink to="/approvals">
-                  <ShieldCheck size={20} />
-                  <span>Validar Evidencias</span>
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/team">
-                  <Users size={20} />
-                  <span>Mi Equipo</span>
-                </NavLink>
-              </li>
-            </>
+            <li>
+              <NavLink to="/approvals">
+                <ShieldCheck size={20} />
+                <span>Validar Evidencias</span>
+              </NavLink>
+            </li>
+          )}
+
+          {/* Mi Equipo: /team for Staff, /my-participants for Seniors/Papisados */}
+          {(role === 'Owner' || role === 'Admin' || role === 'Coach' || role === 'Coordinador') && (
+            <li>
+              <NavLink to="/team">
+                <Users size={20} />
+                <span>Mi Equipo</span>
+              </NavLink>
+            </li>
+          )}
+
+          {(role === 'Senior' || role === 'Papisado') && (
+            <li>
+              <NavLink to="/my-participants">
+                <Users size={20} />
+                <span>Mi Equipo</span>
+              </NavLink>
+            </li>
           )}
 
           {/* Standard user menu */}
@@ -75,20 +86,11 @@ export default function Layout() {
               <span>{role === 'Senior' || role === 'Papisado' ? 'Metas de Participantes' : 'Mis Metas'}</span>
             </NavLink>
           </li>
-          
-          {(role === 'Senior' || role === 'Papisado') && (
-            <li>
-              <NavLink to="/my-participants">
-                <UserCheck size={20} />
-                <span>Mis Participantes</span>
-              </NavLink>
-            </li>
-          )}
 
           <li>
             <NavLink to="/actions">
               <CheckSquare size={20} />
-              <span>Mis Acciones</span>
+              <span>{role === 'Senior' || role === 'Papisado' ? 'Acciones de Participantes' : 'Mis Acciones'}</span>
             </NavLink>
           </li>
 

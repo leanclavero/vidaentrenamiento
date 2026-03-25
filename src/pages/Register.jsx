@@ -32,12 +32,12 @@ export default function Register() {
     }
 
     if (data?.user) {
-      const { error: dbError } = await supabase.from('Usuarios').insert([{
+      const { error: dbError } = await supabase.from('Usuarios').upsert([{
         uid: data.user.id,
         nombre,
         apellido,
         email,
-      }]);
+      }], { onConflict: 'uid' });
       
       if (dbError) {
         console.error("Error creating user profile", dbError);

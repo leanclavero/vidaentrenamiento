@@ -1,17 +1,28 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getMisInscripciones } from '../services/inscripcionesService';
+import { getMisInscripciones, getMisParticipantes } from '../services/inscripcionesService';
 import { getMyMetas } from '../services/metasService';
 import { getMyDeclaraciones, createDeclaracion } from '../services/declaracionesService';
 import { uploadEvidencia } from '../services/evidenciasService';
+import { useSearchParams, Link } from 'react-router-dom';
+import { ChevronLeft, CheckSquare } from 'lucide-react';
 
 export default function Declaraciones() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const [searchParams] = useSearchParams();
+  const participantUid = searchParams.get('u');
+  
+  const [participants, setParticipants] = useState([]);
   const [inscripciones, setInscripciones] = useState([]);
   const [selectedInscripcion, setSelectedInscripcion] = useState(null);
+  const [selectedParticipant, setSelectedParticipant] = useState(null);
   const [metas, setMetas] = useState([]);
   const [declaraciones, setDeclaraciones] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Determine role
+  const role = profile?.rol_global || 'Participante';
+  const isSenior = role !== 'Participante';
 
   // Declaracion Form
   const [semana, setSemana] = useState(1);
@@ -28,19 +39,41 @@ export default function Declaraciones() {
 
   useEffect(() => {
     if (!user) return;
-    getMisInscripciones(user.id).then(data => {
-      setInscripciones(data);
-      if (data.length > 0) setSelectedInscripcion(data[0]);
-    }).finally(() => setLoading(false));
-  }, [user]);
+    
+    const init = async () => {
+      setLoading(true);
+      try {
+        if (isSenior && !participantUid) {
+          // Senior view: list participants
+          const data = await getMisParticipantes(user.id);
+          setParticipants(data || []);
+        } else {
+          // Participant view or Senior viewing a specific participant
+          const targetUid = participantUid || user.id;
+          const data = await getMisInscripciones(targetUid);
+          setInscripciones(data || []);
+          if (data && data.length > 0) {
+            setSelectedInscripcion(data[0]);
+            if (participantUid) setSelectedParticipant(data[0].usuario);
+          }
+        }
+      } catch (err) {
+        console.error("Error in init:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
+  }, [user, participantUid, isSenior]);
 
   useEffect(() => {
     if (!selectedInscripcion || !user) return;
     const fetchAll = async () => {
       setLoading(true);
       try {
-        const metasData = await getMyMetas(selectedInscripcion.id_edicion, user.id);
-        const decData = await getMyDeclaraciones(selectedInscripcion.id_edicion, user.id);
+        const targetUid = participantUid || user.id;
+        const metasData = await getMyMetas(selectedInscripcion.id_edicion, targetUid);
+        const decData = await getMyDeclaraciones(selectedInscripcion.id_edicion, targetUid);
         setMetas(metasData || []);
         if (metasData?.length > 0) setMetaSel(metasData[0].id);
         setDeclaraciones(decData || []);
@@ -51,11 +84,11 @@ export default function Declaraciones() {
       }
     };
     fetchAll();
-  }, [selectedInscripcion, user]);
+  }, [selectedInscripcion, user, participantUid]);
 
   const handleCreateDec = async (e) => {
     e.preventDefault();
-    if (!metaSel || !compromiso.trim()) return;
+    if (!metaSel || !compromiso.trim() || participantUid) return;
 
     try {
       setLoading(true);
@@ -67,7 +100,8 @@ export default function Declaraciones() {
       });
       setCompromiso('');
       
-      const decData = await getMyDeclaraciones(selectedInscripcion.id_edicion, user.id);
+      const targetUid = participantUid || user.id;
+      const decData = await getMyDeclaraciones(selectedInscripcion.id_edicion, targetUid);
       setDeclaraciones(decData || []);
     } catch (err) {
       alert("Error al declarar: " + err.message);
@@ -78,7 +112,7 @@ export default function Declaraciones() {
 
   const handleUploadEvi = async (e) => {
     e.preventDefault();
-    if (!eviActiveId) return;
+    if (!eviActiveId || participantUid) return;
     try {
       setUploading(true);
       await uploadEvidencia(eviActiveId, eviFile, eviComment);
@@ -87,7 +121,8 @@ export default function Declaraciones() {
       setEviFile(null);
       setEviComment('');
       
-      const decData = await getMyDeclaraciones(selectedInscripcion.id_edicion, user.id);
+      const targetUid = participantUid || user.id;
+      const decData = await getMyDeclaraciones(selectedInscripcion.id_edicion, targetUid);
       setDeclaraciones(decData || []);
     } catch (err) {
       alert("Error al subir evidencia. ¿Habéis configurado el bucket público 'evidencias' en Supabase Storage? Error: " + err.message);
@@ -96,48 +131,104 @@ export default function Declaraciones() {
     }
   };
 
-  if (loading && inscripciones.length === 0) return <div style={{padding:'2rem'}}>Cargando...</div>;
+  if (loading && participants.length === 0 && inscripciones.length === 0) {
+    return <div style={{ padding: '2rem' }}>Cargando...</div>;
+  }
+
+  // View 1: Senior listing their participants
+  if (isSenior && !participantUid) {
+    return (
+      <div>
+        <h2 style={{ marginBottom: '2rem' }}>Acciones de Participantes</h2>
+        {participants.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+            <p style={{ color: 'var(--text-muted)' }}>No tienes participantes asignados para ver sus acciones.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+            {participants.map(ins => {
+              const p = ins.usuario;
+              const name = p.nombre && p.nombre !== 'Usuario' ? `${p.nombre} ${p.apellido}` : p.email.split('@')[0];
+              return (
+                <Link key={ins.id} to={`?u=${p.uid}`} className="card" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '1rem', transition: 'transform 0.2s' }}>
+                  <div className="avatar">{name.substring(0, 2).toUpperCase()}</div>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ margin: 0, color: 'var(--text-main)' }}>{name}</h4>
+                    <small style={{ color: 'var(--text-muted)' }}>{p.email}</small>
+                  </div>
+                  <CheckSquare size={20} color="var(--primary-color)" />
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // View 2: Empty state for participants
+  if (!loading && inscripciones.length === 0) {
+    return (
+      <div className="card">
+        <h4>No se encontraron ediciones</h4>
+        <p style={{ color: 'var(--text-muted)' }}>Este usuario no está inscrito en ninguna edición activa.</p>
+        {isSenior && <Link to="/actions" className="btn btn-secondary" style={{ marginTop: '1rem', display: 'inline-block' }}>Volver</Link>}
+      </div>
+    );
+  }
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h2>Mis Acciones & Evidencias</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {participantUid && (
+            <Link to="/actions" className="btn btn-secondary" style={{ padding: '0.5rem', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ChevronLeft size={20} />
+            </Link>
+          )}
+          <div>
+            <h2 style={{ margin: 0 }}>{participantUid ? `Acciones de ${selectedParticipant?.nombre || 'Participante'}` : 'Mis Acciones & Evidencias'}</h2>
+            {participantUid && <small style={{ color: 'var(--text-muted)' }}>{selectedParticipant?.email}</small>}
+          </div>
+        </div>
       </div>
 
-      {metas.length === 0 ? (
-        <div className="card">
-          <p>Debes definir tus Metas primero antes de poder declarar acciones semanales.</p>
-        </div>
-      ) : (
-        <form onSubmit={handleCreateDec} className="card" style={{ marginBottom: '2rem' }}>
-          <h4>Declarar Nueva Acción</h4>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end', marginTop: '1rem' }}>
-            <div className="form-group" style={{ flex: '1 1 100px', marginBottom: 0 }}>
-              <label>Semana Nro</label>
-              <input type="number" min="1" max="50" value={semana} onChange={e => setSemana(parseInt(e.target.value))} required />
-            </div>
-            <div className="form-group" style={{ flex: '2 1 200px', marginBottom: 0 }}>
-              <label>Meta Asociada</label>
-              <select value={metaSel} onChange={e => setMetaSel(e.target.value)} required style={{width: '100%', padding:'0.75rem', background:'rgba(0,0,0,0.2)', color:'white', borderRadius:'0.5rem', border:'1px solid var(--border-color)'}}>
-                {metas.map(m => <option key={m.id} value={m.id}>{m.eje} - {m.descripcion.substring(0,30)}</option>)}
-              </select>
-            </div>
-            <div className="form-group" style={{ flex: '3 1 300px', marginBottom: 0 }}>
-              <label>Acción / Compromiso</label>
-              <input type="text" value={compromiso} onChange={e => setCompromiso(e.target.value)} required placeholder="Ej. Ir al gimnasio 3 veces" />
-            </div>
-            <div className="form-group" style={{ flex: '1 1 150px', marginBottom: 0 }}>
-              <label>Esperado</label>
-              <select value={tipoEvi} onChange={e => setTipoEvi(e.target.value)} required style={{width: '100%', padding:'0.75rem', background:'rgba(0,0,0,0.2)', color:'white', borderRadius:'0.5rem', border:'1px solid var(--border-color)'}}>
-                <option value="única vez">Única vez (1 foto)</option>
-                <option value="múltiples veces">Varias (múltiples fotos)</option>
-              </select>
-            </div>
-            <button type="submit" className="btn btn-primary" style={{ flex: '0 0 auto', width: 'auto' }} disabled={loading}>
-              {loading ? '...' : '+ Declarar'}
-            </button>
+      {!participantUid && (
+        metas.length === 0 ? (
+          <div className="card">
+            <p>Debes definir tus Metas primero antes de poder declarar acciones semanales.</p>
           </div>
-        </form>
+        ) : (
+          <form onSubmit={handleCreateDec} className="card" style={{ marginBottom: '2rem' }}>
+            <h4>Declarar Nueva Acción</h4>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end', marginTop: '1rem' }}>
+              <div className="form-group" style={{ flex: '1 1 100px', marginBottom: 0 }}>
+                <label>Semana Nro</label>
+                <input type="number" min="1" max="50" value={semana} onChange={e => setSemana(parseInt(e.target.value))} required />
+              </div>
+              <div className="form-group" style={{ flex: '2 1 200px', marginBottom: 0 }}>
+                <label>Meta Asociada</label>
+                <select value={metaSel} onChange={e => setMetaSel(e.target.value)} required style={{width: '100%', padding:'0.75rem', background:'rgba(0,0,0,0.2)', color:'white', borderRadius:'0.5rem', border:'1px solid var(--border-color)'}}>
+                  {metas.map(m => <option key={m.id} value={m.id}>{m.eje} - {m.descripcion.substring(0,30)}</option>)}
+                </select>
+              </div>
+              <div className="form-group" style={{ flex: '3 1 300px', marginBottom: 0 }}>
+                <label>Acción / Compromiso</label>
+                <input type="text" value={compromiso} onChange={e => setCompromiso(e.target.value)} required placeholder="Ej. Ir al gimnasio 3 veces" />
+              </div>
+              <div className="form-group" style={{ flex: '1 1 150px', marginBottom: 0 }}>
+                <label>Esperado</label>
+                <select value={tipoEvi} onChange={e => setTipoEvi(e.target.value)} required style={{width: '100%', padding:'0.75rem', background:'rgba(0,0,0,0.2)', color:'white', borderRadius:'0.5rem', border:'1px solid var(--border-color)'}}>
+                  <option value="única vez">Única vez (1 foto)</option>
+                  <option value="múltiples veces">Varias (múltiples fotos)</option>
+                </select>
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ flex: '0 0 auto', width: 'auto' }} disabled={loading}>
+                {loading ? '...' : '+ Declarar'}
+              </button>
+            </div>
+          </form>
+        )
       )}
 
       <h4>Historial de Acciones Semanales</h4>
@@ -184,7 +275,7 @@ export default function Declaraciones() {
                         {eviReciente.comentario_participante && <div style={{fontStyle:'italic', marginTop:'0.25rem'}}>"{eviReciente.comentario_participante}"</div>}
                       </div>
                    )}
-                   {dec.estado_validacion !== 'Aprobado' && (
+                   {(!participantUid && dec.estado_validacion !== 'Aprobado') && (
                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                        <span style={{fontSize:'0.8rem', color:'var(--text-muted)'}}>{dec.tipo_evidencia}</span>
                        <button onClick={()=>setEviActiveId(dec.id_declaracion)} className="btn btn-secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.8rem', border:'1px solid var(--primary-color)', color:'var(--primary-color)' }}>
