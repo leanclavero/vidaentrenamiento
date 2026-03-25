@@ -367,3 +367,16 @@ select option {
   font-size: 0.8rem;
   flex-shrink: 0;
 }
+/* Sidebar Badge */
+.nav-badge {
+  background: var(--error-color);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-left: auto;
+  min-width: 18px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+}

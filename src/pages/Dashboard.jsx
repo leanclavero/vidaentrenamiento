@@ -1,11 +1,31 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { getEvidenciasPendientes } from '../services/evidenciasService';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
+  const [pendingCount, setPendingCount] = useState(0);
+  const [loading, setLoading] = useState(false);
   
-  // Temporalmente determinamos el rol general desde el profile o asignamos Participante
   const role = profile?.rol_global || 'Participante';
+
+  useEffect(() => {
+    if (!user || role === 'Participante') return;
+
+    const fetchStats = async () => {
+      setLoading(true);
+      try {
+        const data = await getEvidenciasPendientes();
+        setPendingCount(data?.length || 0);
+      } catch (err) {
+        console.error("Error fetching stats:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [user, role]);
 
   return (
     <div>
@@ -19,21 +39,27 @@ export default function Dashboard() {
       {role === 'Participante' && (
         <div className="card">
           <h4>Mis Acciones Pendientes</h4>
-          <p>Aún no tienes acciones declaradas para esta semana. (Próximamente)</p>
+          <p>Aún no tienes acciones declaradas para esta semana.</p>
         </div>
       )}
       
       {(role === 'Senior' || role === 'Papisado') && (
         <div className="card">
           <h4>Evidencias por Aprobar</h4>
-          <p>Tienes 0 evidencias pendientes de tu equipo asignado. (Próximamente)</p>
+          <p>
+            {loading ? 'Cargando estadísticas...' : (
+              pendingCount > 0 
+                ? `Tienes ${pendingCount} evidencias pendientes de tu equipo asignado.`
+                : 'No tienes evidencias pendientes por revisar. ¡Gran trabajo!'
+            )}
+          </p>
         </div>
       )}
       
       {(role === 'Coach' || role === 'Coordinador' || role === 'Admin' || role === 'Owner') && (
         <div className="card">
           <h4>Estadísticas de la Edición</h4>
-          <p>Participantes activos pendientes de cargar acciones: 0 (Próximamente)</p>
+          <p>Hay {pendingCount} evidencias pendientes de validación en total.</p>
         </div>
       )}
     </div>

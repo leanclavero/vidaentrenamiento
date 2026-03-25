@@ -1,19 +1,37 @@
-import React from 'react';
+// v1.1 - Added Notification Badges for Seniors
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { NavLink, useNavigate, Outlet } from 'react-router-dom';
+import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { LogOut, Home, Users, Target, Calendar, CheckSquare, ShieldCheck, UserPlus, Settings, UserCheck } from 'lucide-react';
+import { getEvidenciasPendientes } from '../services/evidenciasService';
 
 export default function Layout() {
   const { user, profile, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [pendingCount, setPendingCount] = useState(0);
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
-  // Determine user role (now normalized in AuthContext)
   const role = profile?.rol_global || 'Participante';
+
+  useEffect(() => {
+    if (!user || role === 'Participante') return;
+
+    const fetchPending = async () => {
+      try {
+        const data = await getEvidenciasPendientes();
+        setPendingCount(data?.length || 0);
+      } catch (err) {
+        console.error("Sidebar count error:", err);
+      }
+    };
+
+    fetchPending();
+  }, [user, role, location.pathname]);
 
   return (
     <div className="layout-container">
@@ -30,7 +48,6 @@ export default function Layout() {
             </NavLink>
           </li>
           
-          {/* Menu for Owners/Admins specifically */}
           {(role === 'Owner' || role === 'Admin') && (
             <li>
               <NavLink to="/assignments">
@@ -40,7 +57,6 @@ export default function Layout() {
             </li>
           )}
 
-          {/* Menu for Ediciones management (Staff only) */}
           {(role === 'Owner' || role === 'Admin' || role === 'Coach' || role === 'Coordinador') && (
             <li>
               <NavLink to="/editions">
@@ -50,17 +66,16 @@ export default function Layout() {
             </li>
           )}
 
-          {/* Validation menu for Staff (Seniors/Papisados/Admins/Coaches) */}
           {(role !== 'Participante') && (
             <li>
               <NavLink to="/approvals">
                 <ShieldCheck size={20} />
                 <span>Validar Evidencias</span>
+                {pendingCount > 0 && <span className="nav-badge">{pendingCount}</span>}
               </NavLink>
             </li>
           )}
 
-          {/* Mi Equipo: /team for Staff, /my-participants for Seniors/Papisados */}
           {(role === 'Owner' || role === 'Admin' || role === 'Coach' || role === 'Coordinador') && (
             <li>
               <NavLink to="/team">
@@ -79,7 +94,6 @@ export default function Layout() {
             </li>
           )}
 
-          {/* Standard user menu */}
           <li>
             <NavLink to="/goals">
               <Target size={20} />
@@ -123,3 +137,4 @@ export default function Layout() {
     </div>
   );
 }
+
