@@ -41,3 +41,15 @@ export const removeUserFromEdition = async (inscripcionId) => {
     .eq('id', inscripcionId);
   if (error) throw error;
 };
+
+// Obtener cantidad de participantes de una edición (Rol 'Participante')
+export const getParticipantsCount = async (idEdicion) => {
+  const { count, error } = await supabase
+    .from('Inscripciones')
+    .select('*', { count: 'exact', head: true })
+    .eq('rol', 'Participante');
+  
+  if (error) throw error;
+  return count || 0;
+};
+

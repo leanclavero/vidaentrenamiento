@@ -40,3 +40,14 @@ export const updateDeclaracion = async (idDeclaracion, updates) => {
   if (error) throw error;
   return data;
 };
+
+// Obtener cantidad total de declaraciones (Acciones) de una edición
+export const getDeclaracionesCount = async (idEdicion) => {
+  const { count, error } = await supabase
+    .from('Declaraciones')
+    .select('*', { count: 'exact', head: true });
+    
+  if (error) throw error;
+  return count || 0;
+};
+

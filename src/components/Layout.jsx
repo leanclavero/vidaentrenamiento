@@ -1,15 +1,17 @@
-// v1.1 - Added Notification Badges for Seniors
+// v1.2 - Refined Labels and Dual Badges (Metas/Acciones)
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom';
-import { LogOut, Home, Users, Target, Calendar, CheckSquare, ShieldCheck, UserPlus, Settings, UserCheck } from 'lucide-react';
+import { LogOut, Home, Users, Target, Calendar, CheckSquare, ShieldCheck, UserPlus, Settings } from 'lucide-react';
 import { getEvidenciasPendientes } from '../services/evidenciasService';
+import { getMetasPendientes } from '../services/metasService';
 
 export default function Layout() {
   const { user, profile, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingEvi, setPendingEvi] = useState(0);
+  const [pendingMetas, setPendingMetas] = useState(0);
 
   const handleLogout = async () => {
     await logout();
@@ -17,20 +19,26 @@ export default function Layout() {
   };
 
   const role = profile?.rol_global || 'Participante';
+  const isStaff = ['Owner', 'Admin', 'Coach', 'Coordinador'].includes(role);
+  const isSenior = ['Senior', 'Papisado'].includes(role);
 
   useEffect(() => {
     if (!user || role === 'Participante') return;
 
-    const fetchPending = async () => {
+    const fetchAllPending = async () => {
       try {
-        const data = await getEvidenciasPendientes();
-        setPendingCount(data?.length || 0);
+        const [eviData, metasData] = await Promise.all([
+          getEvidenciasPendientes(),
+          getMetasPendientes()
+        ]);
+        setPendingEvi(eviData?.length || 0);
+        setPendingMetas(metasData?.length || 0);
       } catch (err) {
-        console.error("Sidebar count error:", err);
+        console.error("Sidebar counts error:", err);
       }
     };
 
-    fetchPending();
+    fetchAllPending();
   }, [user, role, location.pathname]);
 
   return (
@@ -71,12 +79,12 @@ export default function Layout() {
               <NavLink to="/approvals">
                 <ShieldCheck size={20} />
                 <span>Validar Evidencias</span>
-                {pendingCount > 0 && <span className="nav-badge">{pendingCount}</span>}
+                {pendingEvi > 0 && <span className="nav-badge">{pendingEvi}</span>}
               </NavLink>
             </li>
           )}
 
-          {(role === 'Owner' || role === 'Admin' || role === 'Coach' || role === 'Coordinador') && (
+          {isStaff && (
             <li>
               <NavLink to="/team">
                 <Users size={20} />
@@ -85,7 +93,7 @@ export default function Layout() {
             </li>
           )}
 
-          {(role === 'Senior' || role === 'Papisado') && (
+          {isSenior && (
             <li>
               <NavLink to="/my-participants">
                 <Users size={20} />
@@ -97,14 +105,19 @@ export default function Layout() {
           <li>
             <NavLink to="/goals">
               <Target size={20} />
-              <span>{role === 'Senior' || role === 'Papisado' ? 'Metas de Participantes' : 'Mis Metas'}</span>
+              <span>
+                {isStaff ? 'Metas' : (isSenior ? 'Metas de Participantes' : 'Mis Metas')}
+              </span>
+              {isStaff && pendingMetas > 0 && <span className="nav-badge">{pendingMetas}</span>}
             </NavLink>
           </li>
 
           <li>
             <NavLink to="/actions">
               <CheckSquare size={20} />
-              <span>{role === 'Senior' || role === 'Papisado' ? 'Acciones de Participantes' : 'Mis Acciones'}</span>
+              <span>
+                {isStaff ? 'Acciones' : (isSenior ? 'Acciones de Participantes' : 'Mis Acciones')}
+              </span>
             </NavLink>
           </li>
 

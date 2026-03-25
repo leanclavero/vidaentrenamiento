@@ -1,18 +1,26 @@
-// v1.1 - Added Goals Approval Stats for Staff
+// v1.2 - Reordered metrics & Clickable Cards
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 import { getEvidenciasPendientes } from '../services/evidenciasService';
 import { getMetasPendientes } from '../services/metasService';
+import { getParticipantsCount } from '../services/asignacionesService';
+import { getDeclaracionesCount } from '../services/declaracionesService';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
-  const [eviCount, setEviCount] = useState(0);
-  const [metasCount, setMetasCount] = useState(0);
-  const [metasUsersCount, setMetasUsersCount] = useState(0);
+  const [stats, setStats] = useState({
+    participants: 0,
+    metas: 0,
+    declaraciones: 0,
+    evidencias: 0,
+    metasUsers: 0
+  });
   const [loading, setLoading] = useState(false);
   
   const role = profile?.rol_global || 'Participante';
   const isStaff = ['Owner', 'Admin', 'Coach', 'Coordinador'].includes(role);
+  const isSenior = ['Senior', 'Papisado'].includes(role);
 
   useEffect(() => {
     if (!user || role === 'Participante') return;
@@ -20,17 +28,22 @@ export default function Dashboard() {
     const fetchStats = async () => {
       setLoading(true);
       try {
-        // Evidencias
-        const eviData = await getEvidenciasPendientes();
-        setEviCount(eviData?.length || 0);
+        const [pCount, mData, dCount, eData] = await Promise.all([
+          getParticipantsCount(),
+          getMetasPendientes(),
+          getDeclaracionesCount(),
+          getEvidenciasPendientes()
+        ]);
 
-        // Metas (only for higher staff)
-        if (isStaff) {
-          const metasData = await getMetasPendientes();
-          setMetasCount(metasData?.length || 0);
-          const uniqueUsers = new Set(metasData?.map(m => m.id_usuario));
-          setMetasUsersCount(uniqueUsers.size);
-        }
+        const uniqueMetasUsers = new Set(mData?.map(m => m.id_usuario)).size;
+
+        setStats({
+          participants: pCount || 0,
+          metas: mData?.length || 0,
+          declaraciones: dCount || 0,
+          evidencias: eData?.length || 0,
+          metasUsers: uniqueMetasUsers
+        });
       } catch (err) {
         console.error("Error fetching stats:", err);
       } finally {
@@ -39,7 +52,7 @@ export default function Dashboard() {
     };
 
     fetchStats();
-  }, [user, role, isStaff]);
+  }, [user, role]);
 
   return (
     <div>
@@ -57,32 +70,50 @@ export default function Dashboard() {
         </div>
       )}
       
-      {(role === 'Senior' || role === 'Papisado') && (
-        <div className="card">
-          <h4>Evidencias por Aprobar</h4>
-          <p>
-            {loading ? 'Cargando estadísticas...' : (
-              eviCount > 0 
-                ? `Tienes ${eviCount} evidencias pendientes de tu equipo asignado.`
-                : 'No tienes evidencias pendientes por revisar. ¡Gran trabajo!'
-            )}
-          </p>
-        </div>
-      )}
-      
-      {isStaff && (
+      {(isStaff || isSenior) && (
         <div className="card">
           <h4>Estadísticas de la Edición</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
-            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '0.5rem' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>{eviCount}</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Evidencias pendientes</div>
+          {loading ? (
+            <p style={{ color: 'var(--text-muted)' }}>Cargando métricas...</p>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+              
+              {/* 1. Participantes */}
+              <Link to={isStaff ? "/team" : "/my-participants"} style={{ textDecoration: 'none' }}>
+                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid var(--border-color)', transition: 'transform 0.2s', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.02)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'}>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#10b981' }}>{stats.participants}</div>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Participantes</div>
+                </div>
+              </Link>
+
+              {/* 2. Metas */}
+              <Link to="/goals" style={{ textDecoration: 'none' }}>
+                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid var(--border-color)', transition: 'transform 0.2s' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.02)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'}>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#fbbf24' }}>{stats.metas}</div>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                    {isStaff ? `Metas (de ${stats.metasUsers} pers.) por aprobar` : 'Metas totales'}
+                  </div>
+                </div>
+              </Link>
+
+              {/* 3. Declaraciones */}
+              <Link to="/actions" style={{ textDecoration: 'none' }}>
+                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid var(--border-color)', transition: 'transform 0.2s' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.02)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'}>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#6366f1' }}>{stats.declaraciones}</div>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Declaraciones (Acciones)</div>
+                </div>
+              </Link>
+
+              {/* 4. Evidencias */}
+              <Link to="/approvals" style={{ textDecoration: 'none' }}>
+                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid var(--border-color)', transition: 'transform 0.2s' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.02)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'}>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#ef4444' }}>{stats.evidencias}</div>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Evidencias pendientes</div>
+                </div>
+              </Link>
+
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '0.5rem' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fbbf24' }}>{metasCount}</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Metas de {metasUsersCount} participantes por aprobar</div>
-            </div>
-          </div>
+          )}
         </div>
       )}
     </div>
