@@ -1,3 +1,4 @@
+// v1.2 - Added Image Compression, Axis labels, and Full Spanish translation
 import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getMisInscripciones, getMisParticipantes } from '../services/inscripcionesService';
@@ -5,7 +6,61 @@ import { getMyMetas } from '../services/metasService';
 import { getMyDeclaraciones, createDeclaracion } from '../services/declaracionesService';
 import { uploadEvidencia } from '../services/evidenciasService';
 import { useSearchParams, Link } from 'react-router-dom';
-import { ChevronLeft, CheckSquare } from 'lucide-react';
+import { ChevronLeft, CheckSquare, Upload, FileText } from 'lucide-react';
+
+// Helper for image compression to ~100kb
+const compressImage = (file, maxKB = 100) => {
+  return new Promise((resolve) => {
+    if (!file || !file.type.startsWith('image/')) return resolve(file);
+    
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Max dimension ~1200px for reasonable quality vs size
+        const maxDim = 1200;
+        if (width > height) {
+          if (width > maxDim) {
+            height *= maxDim / width;
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width *= maxDim / height;
+            height = maxDim;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        let quality = 0.7;
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        
+        // Iterate quality to reach target size
+        while (dataUrl.length > maxKB * 1024 * 1.33 && quality > 0.1) {
+          quality -= 0.1;
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+        
+        fetch(dataUrl)
+          .then(res => res.blob())
+          .then(blob => {
+            const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: 'image/jpeg' });
+            resolve(newFile);
+          });
+      };
+    };
+  });
+};
 
 export default function Declaraciones() {
   const { user, profile } = useAuth();
@@ -44,11 +99,9 @@ export default function Declaraciones() {
       setLoading(true);
       try {
         if (isSenior && !participantUid) {
-          // Senior view: list participants
           const data = await getMisParticipantes(user.id);
           setParticipants(data || []);
         } else {
-          // Participant view or Senior viewing a specific participant
           const targetUid = participantUid || user.id;
           const data = await getMisInscripciones(targetUid);
           setInscripciones(data || []);
@@ -112,11 +165,15 @@ export default function Declaraciones() {
 
   const handleUploadEvi = async (e) => {
     e.preventDefault();
-    if (!eviActiveId || participantUid) return;
+    if (!eviActiveId || !eviFile || participantUid) return;
     try {
       setUploading(true);
-      await uploadEvidencia(eviActiveId, eviFile, eviComment);
-      alert("Evidencia subida correctamente y enviada a validación.");
+      
+      // Compress before upload
+      const compressedFile = await compressImage(eviFile, 100);
+      
+      await uploadEvidencia(eviActiveId, compressedFile, eviComment);
+      alert("Evidencia subida correctamente y enviada a revisión.");
       setEviActiveId(null);
       setEviFile(null);
       setEviComment('');
@@ -125,7 +182,7 @@ export default function Declaraciones() {
       const decData = await getMyDeclaraciones(selectedInscripcion.id_edicion, targetUid);
       setDeclaraciones(decData || []);
     } catch (err) {
-      alert("Error al subir evidencia. ¿Habéis configurado el bucket público 'evidencias' en Supabase Storage? Error: " + err.message);
+      alert("Error al subir evidencia: " + err.message);
     } finally {
       setUploading(false);
     }
@@ -135,14 +192,13 @@ export default function Declaraciones() {
     return <div style={{ padding: '2rem' }}>Cargando...</div>;
   }
 
-  // View 1: Senior listing their participants
   if (isSenior && !participantUid) {
     return (
       <div>
         <h2 style={{ marginBottom: '2rem' }}>Acciones de Participantes</h2>
         {participants.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <p style={{ color: 'var(--text-muted)' }}>No tienes participantes asignados para ver sus acciones.</p>
+            <p style={{ color: 'var(--text-muted)' }}>No tienes participantes asignados.</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
@@ -166,12 +222,11 @@ export default function Declaraciones() {
     );
   }
 
-  // View 2: Empty state for participants
   if (!loading && inscripciones.length === 0) {
     return (
       <div className="card">
         <h4>No se encontraron ediciones</h4>
-        <p style={{ color: 'var(--text-muted)' }}>Este usuario no está inscrito en ninguna edición activa.</p>
+        <p style={{ color: 'var(--text-muted)' }}>No estás inscrito en ninguna edición activa.</p>
         {isSenior && <Link to="/actions" className="btn btn-secondary" style={{ marginTop: '1rem', display: 'inline-block' }}>Volver</Link>}
       </div>
     );
@@ -196,7 +251,7 @@ export default function Declaraciones() {
       {!participantUid && (
         metas.length === 0 ? (
           <div className="card">
-            <p>Debes definir tus Metas primero antes de poder declarar acciones semanales.</p>
+            <p>Debes definir tus Metas primero.</p>
           </div>
         ) : (
           <form onSubmit={handleCreateDec} className="card" style={{ marginBottom: '2rem' }}>
@@ -209,18 +264,18 @@ export default function Declaraciones() {
               <div className="form-group" style={{ flex: '2 1 200px', marginBottom: 0 }}>
                 <label>Meta Asociada</label>
                 <select value={metaSel} onChange={e => setMetaSel(e.target.value)} required style={{width: '100%', padding:'0.75rem', background:'rgba(0,0,0,0.2)', color:'white', borderRadius:'0.5rem', border:'1px solid var(--border-color)'}}>
-                  {metas.map(m => <option key={m.id} value={m.id}>{m.titulo || m.descripcion.substring(0,30)}</option>)}
+                  {metas.map(m => <option key={m.id} value={m.id}>[{m.eje}] {m.titulo || m.descripcion.substring(0,30)}</option>)}
                 </select>
               </div>
               <div className="form-group" style={{ flex: '3 1 300px', marginBottom: 0 }}>
                 <label>Acción / Compromiso</label>
-                <input type="text" value={compromiso} onChange={e => setCompromiso(e.target.value)} required placeholder="Ej. Ir al gimnasio 3 veces" />
+                <input type="text" value={compromiso} onChange={e => setCompromiso(e.target.value)} required placeholder="Ej. Ir al gimnasio" />
               </div>
               <div className="form-group" style={{ flex: '1 1 150px', marginBottom: 0 }}>
                 <label>Ejecución</label>
                 <select value={tipoEvi} onChange={e => setTipoEvi(e.target.value)} required style={{width: '100%', padding:'0.75rem', background:'rgba(0,0,0,0.2)', color:'white', borderRadius:'0.5rem', border:'1px solid var(--border-color)'}}>
-                  <option value="única vez">1 vez a la semana</option>
-                  <option value="múltiples veces">Más de una vez a la semana</option>
+                  <option value="única vez">1 vez</option>
+                  <option value="múltiples veces">Varias veces</option>
                 </select>
               </div>
               <button type="submit" className="btn btn-primary" style={{ flex: '0 0 auto', width: 'auto' }} disabled={loading}>
@@ -242,27 +297,36 @@ export default function Declaraciones() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{color:'var(--primary-color)', fontWeight:'bold'}}>Semana {dec.semana_nro}</span>
                 <span style={{fontSize:'0.8rem', padding:'0.2rem 0.6rem', borderRadius:'1rem', background: dec.estado_validacion === 'Aprobado' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.05)'}}>
-                  {dec.estado_validacion}
+                  {dec.estado_validacion === 'Pendiente' ? 'Pendiente' : (dec.estado_validacion === 'Aprobado' ? 'Aprobado' : 'Rechazado')}
                 </span>
               </div>
               <p style={{ marginTop:'0.5rem', fontWeight:'500'}}>{dec.descripcion_compromiso}</p>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Meta Asociada: {meta?.titulo || meta?.descripcion || 'Desconocida'}
+                Meta Asociada: {meta ? `[${meta.eje}] ${meta.titulo || meta.descripcion.substring(0,30)}` : 'Desconocida'}
               </p>
               <hr style={{ borderColor: 'var(--border-color)', margin: '1rem 0', opacity: 0.5 }} />
               
               {eviActiveId === dec.id_declaracion ? (
                 <form onSubmit={handleUploadEvi} style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '0.5rem' }}>
                   <div className="form-group">
-                    <label>Adjuntar Foto / Archivo (Requerirá Bucket)</label>
-                    <input type="file" ref={fileInputRef} onChange={e => setEviFile(e.target.files[0])} accept="image/*" />
+                    <label style={{ display: 'block', marginBottom: '0.5rem' }}>Adjuntar Foto (Máx 100kb auto-ajustado)</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <label className="btn btn-secondary" style={{ flex: '0 0 auto', margin: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Upload size={16} />
+                        {eviFile ? 'Cambiar Foto' : 'Seleccionar Foto'}
+                        <input type="file" ref={fileInputRef} onChange={e => setEviFile(e.target.files[0])} accept="image/*" style={{ display: 'none' }} />
+                      </label>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {eviFile ? eviFile.name : 'Ningún archivo seleccionado'}
+                      </span>
+                    </div>
                   </div>
                   <div className="form-group">
                     <label>Comentario (Opcional)</label>
-                    <input type="text" value={eviComment} onChange={e => setEviComment(e.target.value)} placeholder="Logrado!" />
+                    <input type="text" value={eviComment} onChange={e => setEviComment(e.target.value)} placeholder="Ej. ¡Misión cumplida!" />
                   </div>
                   <div style={{display:'flex', gap:'0.5rem'}}>
-                    <button type="submit" className="btn btn-primary" disabled={uploading}>{uploading ? 'Subiendo...' : 'Enviar Evidencia'}</button>
+                    <button type="submit" className="btn btn-primary" disabled={uploading || !eviFile}>{uploading ? 'Procesando...' : 'Enviar Evidencia'}</button>
                     <button type="button" className="btn btn-secondary" onClick={()=>setEviActiveId(null)} disabled={uploading}>Cancelar</button>
                   </div>
                 </form>
@@ -271,14 +335,16 @@ export default function Declaraciones() {
                    {eviReciente && (
                       <div style={{marginBottom:'1rem', fontSize:'0.85rem', background:'rgba(255,255,255,0.02)', padding:'0.75rem', borderRadius:'0.5rem'}}>
                         <div style={{color:'var(--text-muted)', marginBottom:'0.25rem'}}>Última evidencia ({eviReciente.estado_validacion}):</div>
-                        {eviReciente.url_foto_evidencia ? <a href={eviReciente.url_foto_evidencia} target="_blank" rel="noreferrer" style={{color:'var(--primary-color)'}}>👉 Ver Foto</a> : <span>Archivo subiendo/pendiente</span>}
+                        {eviReciente.url_foto_evidencia ? <a href={eviReciente.url_foto_evidencia} target="_blank" rel="noreferrer" style={{color:'var(--primary-color)', display: 'flex', alignItems: 'center', gap: '0.4rem'}}>
+                          <FileText size={14} /> Ver archivo subido
+                        </a> : <span>Archivo en proceso</span>}
                         {eviReciente.comentario_participante && <div style={{fontStyle:'italic', marginTop:'0.25rem'}}>"{eviReciente.comentario_participante}"</div>}
                       </div>
                    )}
                    {(!participantUid && dec.estado_validacion !== 'Aprobado') && (
                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <span style={{fontSize:'0.8rem', color:'var(--text-muted)'}}>
-                         {dec.tipo_evidencia === 'única vez' ? '1 vez a la semana' : 'Más de una vez a la semana'}
+                       <span style={{fontSize:'0.8rem', color:'var(--text-muted)', fontWeight: 'bold'}}>
+                         {dec.tipo_evidencia === 'única vez' ? '1 vez' : 'Varias veces'}
                        </span>
                        <button onClick={()=>setEviActiveId(dec.id_declaracion)} className="btn btn-secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.8rem', border:'1px solid var(--primary-color)', color:'var(--primary-color)' }}>
                          + Subir Foto
@@ -291,9 +357,10 @@ export default function Declaraciones() {
            )
         })}
         {declaraciones.length === 0 && (
-          <p style={{ color: 'var(--text-muted)', gridColumn: '1 / -1' }}>No tienes declaraciones aún.</p>
+          <p style={{ color: 'var(--text-muted)', gridColumn: '1 / -1' }}>No hay acciones declaradas aún.</p>
         )}
       </div>
     </div>
   );
 }
+

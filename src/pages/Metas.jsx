@@ -1,9 +1,12 @@
+// v1.1 - Added Goal Titles and Refined Editing
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getMisInscripciones, getMisParticipantes } from '../services/inscripcionesService';
 import { getMyMetas, createMeta, deleteMeta, updateMeta } from '../services/metasService';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Target, ChevronLeft, User } from 'lucide-react';
+import { Target, ChevronLeft, User, Pencil, Trash2 } from 'lucide-react';
+/* ... rest of imports ... */
+
 
 const AREAS = ['Personal', 'Relaciones', 'Profesional', 'Comunitario', 'Finanzas', 'Enrolamiento'];
 
@@ -270,31 +273,54 @@ export default function Metas() {
                     <li key={meta.id} style={{ marginBottom: '0.75rem', fontSize: '0.95rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(0,0,0,0.15)', padding: '0.75rem', borderRadius: '0.5rem' }}>
                       {editingMeta === meta.id ? (
                         <form onSubmit={handleUpdate} style={{ width: '100%' }}>
+                          <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Título (Corto)</label>
                           <input type="text" value={editTitulo} onChange={e => setEditTitulo(e.target.value)} required placeholder="Título" style={{ marginBottom: '0.5rem', width: '100%' }} />
-                          <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} required style={{ width: '100%', minHeight: '60px', borderRadius: '0.5rem', padding: '0.5rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid var(--border-color)' }} />
+                          
+                          <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            Descripción {meta.estado === 'Cerrada' ? '(Protegida - Solo Staff)' : ''}
+                          </label>
+                          <textarea 
+                            value={editDesc} 
+                            onChange={e => setEditDesc(e.target.value)} 
+                            required 
+                            disabled={meta.estado === 'Cerrada'}
+                            style={{ 
+                              width: '100%', 
+                              minHeight: '60px', 
+                              borderRadius: '0.5rem', 
+                              padding: '0.5rem', 
+                              background: meta.estado === 'Cerrada' ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)', 
+                              color: meta.estado === 'Cerrada' ? 'var(--text-muted)' : 'white', 
+                              border: '1px solid var(--border-color)',
+                              cursor: meta.estado === 'Cerrada' ? 'not-allowed' : 'text'
+                            }} 
+                          />
+                          
                           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                            <button type="submit" className="btn btn-primary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}>Guardar</button>
-                            <button type="button" className="btn btn-secondary" onClick={() => setEditingMeta(null)} style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}>Cancelar</button>
+                            <button type="submit" className="btn btn-primary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}>Guardar Cambios</button>
+                            <button type="button" className="btn btn-secondary" onClick={() => setEditingMeta(null)} style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}>Cancelar</button>
                           </div>
                         </form>
                       ) : (
                         <>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div style={{ flex: 1 }}>
-                              <strong style={{ display: 'block', color: 'var(--primary-color)', marginBottom: '0.2rem' }}>
-                                {idx + 1}. {meta.titulo || 'Sin título'}
+                              <strong style={{ display: 'block', color: 'var(--primary-color)', marginBottom: '0.2rem', fontSize: '1rem' }}>
+                                {idx + 1}. {meta.titulo || 'Meta sin título'}
                               </strong> 
-                              <span style={{ fontSize: '0.9rem' }}>{meta.descripcion}</span>
+                              <span style={{ fontSize: '0.9rem', color: 'var(--text-main)', opacity: 0.9 }}>{meta.descripcion}</span>
                               {meta.estado === 'Cerrada' && (
-                                <div style={{ marginTop: '0.4rem' }}>
-                                  <span style={{ fontSize: '0.7rem', color: 'var(--error-color)', padding: '0.1rem 0.4rem', border: '1px solid var(--error-color)', borderRadius: '0.3rem' }}>CERRADA</span>
+                                <div style={{ marginTop: '0.5rem' }}>
+                                  <span style={{ fontSize: '0.65rem', color: 'var(--error-color)', padding: '0.1rem 0.4rem', border: '1px solid var(--error-color)', borderRadius: '0.3rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Consolidada</span>
                                 </div>
                               )}
                             </div>
-                            {!participantUid && meta.estado !== 'Cerrada' && (
-                              <div style={{ display: 'flex', gap: '0.3rem' }}>
-                                <button onClick={() => handleStartEdit(meta)} style={{ background: 'transparent', color: 'var(--primary-color)', border: 'none', cursor: 'pointer', padding: '0.2rem', opacity: 0.7 }} title="Editar meta">✎</button>
-                                <button onClick={() => handleDelete(meta.id)} style={{ background: 'transparent', color: 'var(--error-color)', border: 'none', cursor: 'pointer', padding: '0.2rem', opacity: 0.7 }} title="Eliminar meta">✕</button>
+                            {!participantUid && (
+                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button onClick={() => handleStartEdit(meta)} className="btn-icon" style={{ color: 'var(--primary-color)' }} title="Editar meta"><Pencil size={16} /></button>
+                                {meta.estado !== 'Cerrada' && (
+                                  <button onClick={() => handleDelete(meta.id)} className="btn-icon" style={{ color: 'var(--error-color)' }} title="Eliminar meta"><Trash2 size={16} /></button>
+                                )}
                               </div>
                             )}
                           </div>
