@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getMisInscripciones, getMisParticipantes } from '../services/inscripcionesService';
-import { getMyMetas, createMeta, deleteMeta } from '../services/metasService';
+import { getMyMetas, createMeta, deleteMeta, updateMeta } from '../services/metasService';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Target, ChevronLeft, User } from 'lucide-react';
 
@@ -25,7 +25,13 @@ export default function Metas() {
 
   // Form for new meta (only for participants viewing their own)
   const [ejeAdd, setEjeAdd] = useState('Personal');
+  const [tituloAdd, setTituloAdd] = useState('');
   const [descAdd, setDescAdd] = useState('');
+  
+  // State for editing
+  const [editingMeta, setEditingMeta] = useState(null);
+  const [editTitulo, setEditTitulo] = useState('');
+  const [editDesc, setEditDesc] = useState('');
 
   useEffect(() => {
     if (!user) return;
@@ -91,8 +97,10 @@ export default function Metas() {
         id_usuario: user.id,
         id_edicion: selectedInscripcion.id_edicion,
         eje: ejeAdd,
+        titulo: tituloAdd,
         descripcion: descAdd
       });
+      setTituloAdd('');
       setDescAdd('');
       // Reload
       const data = await getMyMetas(selectedInscripcion.id_edicion, user.id);
@@ -112,6 +120,30 @@ export default function Metas() {
       setMetas(prev => prev.filter(m => m.id !== metaId));
     } catch (err) {
       alert("Error al eliminar meta: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartEdit = (meta) => {
+    setEditingMeta(meta.id);
+    setEditTitulo(meta.titulo || '');
+    setEditDesc(meta.descripcion || '');
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    if (!editingMeta) return;
+    try {
+      setLoading(true);
+      await updateMeta(editingMeta, {
+        titulo: editTitulo,
+        descripcion: editDesc
+      });
+      setMetas(prev => prev.map(m => m.id === editingMeta ? { ...m, titulo: editTitulo, descripcion: editDesc } : m));
+      setEditingMeta(null);
+    } catch (err) {
+      alert("Error al actualizar meta: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -196,16 +228,20 @@ export default function Metas() {
         <form onSubmit={handleCreate} className="card" style={{ marginBottom: '2rem' }}>
           <h4>Nueva Meta</h4>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end', marginTop: '1rem' }}>
-            <div className="form-group" style={{ flex: '1 1 200px', marginBottom: 0 }}>
-              <label>Área Requerida</label>
+            <div className="form-group" style={{ flex: '1 1 150px', marginBottom: 0 }}>
+              <label>Área</label>
               <select value={ejeAdd} onChange={e => setEjeAdd(e.target.value)} required 
                 style={{ width: '100%', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', color: 'white', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>
                 {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
+            <div className="form-group" style={{ flex: '1 1 200px', marginBottom: 0 }}>
+              <label>Título (Máx 3 palabras)</label>
+              <input type="text" value={tituloAdd} onChange={e => setTituloAdd(e.target.value)} required placeholder="Ej. Bajar de peso" />
+            </div>
             <div className="form-group" style={{ flex: '2 1 300px', marginBottom: 0 }}>
-              <label>Descripción de la Meta</label>
-              <input type="text" value={descAdd} onChange={e => setDescAdd(e.target.value)} required placeholder="Ej. Bajar 5 kilos este mes" />
+              <label>Descripción detallada</label>
+              <input type="text" value={descAdd} onChange={e => setDescAdd(e.target.value)} required placeholder="Ej. Bajar 5 kilos este mes mediante dieta y ejercicio" />
             </div>
             <button type="submit" className="btn btn-primary" style={{ flex: '0 0 auto', width: 'auto' }} disabled={loading}>
               {loading ? '...' : '+ Agregar'}
@@ -231,13 +267,38 @@ export default function Metas() {
                   <li style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic', textAlign: 'center', padding: '1rem 0' }}>Sin metas definidas.</li>
                 ) : (
                   areaMetas.map((meta, idx) => (
-                    <li key={meta.id} style={{ marginBottom: '0.75rem', fontSize: '0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', background: 'rgba(0,0,0,0.15)', padding: '0.75rem', borderRadius: '0.5rem' }}>
-                      <div style={{ flex: 1 }}>
-                        <strong style={{ color: 'var(--text-muted)', marginRight: '0.5rem' }}>{idx + 1}.</strong> 
-                        {meta.descripcion}
-                      </div>
-                      {!participantUid && (
-                        <button onClick={() => handleDelete(meta.id)} style={{ background: 'transparent', color: 'var(--error-color)', border: 'none', cursor: 'pointer', padding: '0.2rem', opacity: 0.7 }} title="Eliminar meta">✕</button>
+                    <li key={meta.id} style={{ marginBottom: '0.75rem', fontSize: '0.95rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(0,0,0,0.15)', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                      {editingMeta === meta.id ? (
+                        <form onSubmit={handleUpdate} style={{ width: '100%' }}>
+                          <input type="text" value={editTitulo} onChange={e => setEditTitulo(e.target.value)} required placeholder="Título" style={{ marginBottom: '0.5rem', width: '100%' }} />
+                          <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} required style={{ width: '100%', minHeight: '60px', borderRadius: '0.5rem', padding: '0.5rem', background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid var(--border-color)' }} />
+                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                            <button type="submit" className="btn btn-primary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}>Guardar</button>
+                            <button type="button" className="btn btn-secondary" onClick={() => setEditingMeta(null)} style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}>Cancelar</button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div style={{ flex: 1 }}>
+                              <strong style={{ display: 'block', color: 'var(--primary-color)', marginBottom: '0.2rem' }}>
+                                {idx + 1}. {meta.titulo || 'Sin título'}
+                              </strong> 
+                              <span style={{ fontSize: '0.9rem' }}>{meta.descripcion}</span>
+                              {meta.estado === 'Cerrada' && (
+                                <div style={{ marginTop: '0.4rem' }}>
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--error-color)', padding: '0.1rem 0.4rem', border: '1px solid var(--error-color)', borderRadius: '0.3rem' }}>CERRADA</span>
+                                </div>
+                              )}
+                            </div>
+                            {!participantUid && meta.estado !== 'Cerrada' && (
+                              <div style={{ display: 'flex', gap: '0.3rem' }}>
+                                <button onClick={() => handleStartEdit(meta)} style={{ background: 'transparent', color: 'var(--primary-color)', border: 'none', cursor: 'pointer', padding: '0.2rem', opacity: 0.7 }} title="Editar meta">✎</button>
+                                <button onClick={() => handleDelete(meta.id)} style={{ background: 'transparent', color: 'var(--error-color)', border: 'none', cursor: 'pointer', padding: '0.2rem', opacity: 0.7 }} title="Eliminar meta">✕</button>
+                              </div>
+                            )}
+                          </div>
+                        </>
                       )}
                     </li>
                   ))

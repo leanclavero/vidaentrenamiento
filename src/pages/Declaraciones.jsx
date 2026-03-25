@@ -209,7 +209,7 @@ export default function Declaraciones() {
               <div className="form-group" style={{ flex: '2 1 200px', marginBottom: 0 }}>
                 <label>Meta Asociada</label>
                 <select value={metaSel} onChange={e => setMetaSel(e.target.value)} required style={{width: '100%', padding:'0.75rem', background:'rgba(0,0,0,0.2)', color:'white', borderRadius:'0.5rem', border:'1px solid var(--border-color)'}}>
-                  {metas.map(m => <option key={m.id} value={m.id}>{m.eje} - {m.descripcion.substring(0,30)}</option>)}
+                  {metas.map(m => <option key={m.id} value={m.id}>{m.titulo || m.descripcion.substring(0,30)}</option>)}
                 </select>
               </div>
               <div className="form-group" style={{ flex: '3 1 300px', marginBottom: 0 }}>
@@ -217,10 +217,10 @@ export default function Declaraciones() {
                 <input type="text" value={compromiso} onChange={e => setCompromiso(e.target.value)} required placeholder="Ej. Ir al gimnasio 3 veces" />
               </div>
               <div className="form-group" style={{ flex: '1 1 150px', marginBottom: 0 }}>
-                <label>Esperado</label>
+                <label>Ejecución</label>
                 <select value={tipoEvi} onChange={e => setTipoEvi(e.target.value)} required style={{width: '100%', padding:'0.75rem', background:'rgba(0,0,0,0.2)', color:'white', borderRadius:'0.5rem', border:'1px solid var(--border-color)'}}>
-                  <option value="única vez">Única vez (1 foto)</option>
-                  <option value="múltiples veces">Varias (múltiples fotos)</option>
+                  <option value="única vez">1 vez a la semana</option>
+                  <option value="múltiples veces">Más de una vez a la semana</option>
                 </select>
               </div>
               <button type="submit" className="btn btn-primary" style={{ flex: '0 0 auto', width: 'auto' }} disabled={loading}>
@@ -247,7 +247,7 @@ export default function Declaraciones() {
               </div>
               <p style={{ marginTop:'0.5rem', fontWeight:'500'}}>{dec.descripcion_compromiso}</p>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Meta: {meta?.descripcion || 'Desconocida'}
+                Meta Asociada: {meta?.titulo || meta?.descripcion || 'Desconocida'}
               </p>
               <hr style={{ borderColor: 'var(--border-color)', margin: '1rem 0', opacity: 0.5 }} />
               
@@ -277,7 +277,9 @@ export default function Declaraciones() {
                    )}
                    {(!participantUid && dec.estado_validacion !== 'Aprobado') && (
                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <span style={{fontSize:'0.8rem', color:'var(--text-muted)'}}>{dec.tipo_evidencia}</span>
+                       <span style={{fontSize:'0.8rem', color:'var(--text-muted)'}}>
+                         {dec.tipo_evidencia === 'única vez' ? '1 vez a la semana' : 'Más de una vez a la semana'}
+                       </span>
                        <button onClick={()=>setEviActiveId(dec.id_declaracion)} className="btn btn-secondary" style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.8rem', border:'1px solid var(--primary-color)', color:'var(--primary-color)' }}>
                          + Subir Foto
                        </button>

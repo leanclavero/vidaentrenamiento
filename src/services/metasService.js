@@ -31,3 +31,14 @@ export const deleteMeta = async (metaId) => {
   if (error) throw error;
   return true;
 };
+// Actualizar meta
+export const updateMeta = async (metaId, updates) => {
+  const { data, error } = await supabase
+    .from('Metas')
+    .update(updates)
+    .eq('id', metaId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
