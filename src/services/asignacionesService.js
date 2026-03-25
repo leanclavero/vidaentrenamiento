@@ -57,14 +57,16 @@ export const getParticipantsCount = async (idEdicion) => {
 export const getPendingAssignmentsCount = async () => {
   const { data, error } = await supabase
     .from('Usuarios')
-    .select('uid, Inscripciones!id_usuario(id)');
+    .select('email, uid, Inscripciones!id_usuario(id)');
     
   if (error) throw error;
-
   
-  // Filtramos los que tienen el array de inscripciones vacío
-  const pending = data.filter(u => !u.Inscripciones || u.Inscripciones.length === 0);
+  // Filtramos los que tienen el array de inscripciones vacío 
+  // EXCLUIMOS emails de sistema para que el número coincida con la vista de Asignaciones
+  const pending = data.filter(u => 
+    (!u.Inscripciones || u.Inscripciones.length === 0) &&
+    u.email !== 'plclavero@gmail.com' &&
+    u.email !== 'vidaccion@live.com.ar'
+  );
   return pending.length;
 };
-
-

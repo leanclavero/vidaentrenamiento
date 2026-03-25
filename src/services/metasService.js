@@ -48,8 +48,9 @@ export const getMetasPendientes = async () => {
   const { data, error } = await supabase
     .from('Metas')
     .select('*, usuario:Usuarios(nombre, apellido)')
-    .eq('estado', 'Pendiente');
+    .or('estado.eq.Pendiente,estado.eq.Pendiente por Staff');
   if (error) throw error;
+
 
   return data;
 };
