@@ -1,10 +1,11 @@
-// v1.2 - Refined Labels and Dual Badges (Metas/Acciones)
+// v1.3.1 - Sidebar Reordered, Renamed & Triple Badges
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { LogOut, Home, Users, Target, Calendar, CheckSquare, ShieldCheck, UserPlus, Settings } from 'lucide-react';
 import { getEvidenciasPendientes } from '../services/evidenciasService';
 import { getMetasPendientes } from '../services/metasService';
+import { getDeclaracionesPendientes } from '../services/declaracionesService';
 
 export default function Layout() {
   const { user, profile, logout } = useAuth();
@@ -12,6 +13,7 @@ export default function Layout() {
   const location = useLocation();
   const [pendingEvi, setPendingEvi] = useState(0);
   const [pendingMetas, setPendingMetas] = useState(0);
+  const [pendingDec, setPendingDec] = useState(0);
 
   const handleLogout = async () => {
     await logout();
@@ -27,12 +29,14 @@ export default function Layout() {
 
     const fetchAllPending = async () => {
       try {
-        const [eviData, metasData] = await Promise.all([
+        const [eviData, metasData, decData] = await Promise.all([
           getEvidenciasPendientes(),
-          getMetasPendientes()
+          getMetasPendientes(),
+          getDeclaracionesPendientes()
         ]);
         setPendingEvi(eviData?.length || 0);
         setPendingMetas(metasData?.length || 0);
+        setPendingDec(decData?.length || 0);
       } catch (err) {
         console.error("Sidebar counts error:", err);
       }
@@ -49,6 +53,8 @@ export default function Layout() {
           <p className="user-role">{role}</p>
         </div>
         <ul className="sidebar-nav">
+          
+          {/* 1. Dashboard */}
           <li>
             <NavLink to="/">
               <Home size={20} />
@@ -56,6 +62,17 @@ export default function Layout() {
             </NavLink>
           </li>
           
+          {/* 2. Ediciones (Staff only) */}
+          {(isStaff) && (
+            <li>
+              <NavLink to="/editions">
+                <Calendar size={20} />
+                <span>Ediciones</span>
+              </NavLink>
+            </li>
+          )}
+
+          {/* Special: Asignaciones (Admin/Owner only) */}
           {(role === 'Owner' || role === 'Admin') && (
             <li>
               <NavLink to="/assignments">
@@ -65,43 +82,25 @@ export default function Layout() {
             </li>
           )}
 
-          {(role === 'Owner' || role === 'Admin' || role === 'Coach' || role === 'Coordinador') && (
-            <li>
-              <NavLink to="/editions">
-                <Calendar size={20} />
-                <span>Ediciones</span>
-              </NavLink>
-            </li>
-          )}
-
-          {(role !== 'Participante') && (
-            <li>
-              <NavLink to="/approvals">
-                <ShieldCheck size={20} />
-                <span>Validar Evidencias</span>
-                {pendingEvi > 0 && <span className="nav-badge">{pendingEvi}</span>}
-              </NavLink>
-            </li>
-          )}
-
-          {isStaff && (
+          {/* 3. Equipo */}
+          {(isStaff) && (
             <li>
               <NavLink to="/team">
                 <Users size={20} />
-                <span>Mi Equipo</span>
+                <span>Equipo</span>
               </NavLink>
             </li>
           )}
-
-          {isSenior && (
+          {(isSenior && !isStaff) && (
             <li>
               <NavLink to="/my-participants">
                 <Users size={20} />
-                <span>Mi Equipo</span>
+                <span>Equipo</span>
               </NavLink>
             </li>
           )}
 
+          {/* 4. Metas */}
           <li>
             <NavLink to="/goals">
               <Target size={20} />
@@ -112,15 +111,29 @@ export default function Layout() {
             </NavLink>
           </li>
 
+          {/* 5. Declaraciones (formerly Acciones) */}
           <li>
             <NavLink to="/actions">
               <CheckSquare size={20} />
               <span>
-                {isStaff ? 'Acciones' : (isSenior ? 'Acciones de Participantes' : 'Mis Acciones')}
+                {isStaff ? 'Declaraciones' : (isSenior ? 'Declaraciones de Participantes' : 'Mis Declaraciones')}
               </span>
+              {isStaff && pendingDec > 0 && <span className="nav-badge">{pendingDec}</span>}
             </NavLink>
           </li>
 
+          {/* 6. Evidencias (formerly Validar Evidencias) */}
+          {(role !== 'Participante') && (
+            <li>
+              <NavLink to="/approvals">
+                <ShieldCheck size={20} />
+                <span>Evidencias</span>
+                {pendingEvi > 0 && <span className="nav-badge">{pendingEvi}</span>}
+              </NavLink>
+            </li>
+          )}
+
+          {/* 7. Ajustes */}
           <li style={{ marginTop: 'auto' }}>
             <NavLink to="/settings">
               <Settings size={20} />
@@ -150,4 +163,3 @@ export default function Layout() {
     </div>
   );
 }
-

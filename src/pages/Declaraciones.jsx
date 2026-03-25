@@ -1,12 +1,12 @@
-// v1.3 - Staff Mass View for Actions
+// v1.3 - Mass View & Approval for Declarations
 import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getMisInscripciones, getMisParticipantes, getInscripciones } from '../services/inscripcionesService';
 import { getMyMetas } from '../services/metasService';
-import { getMyDeclaraciones, createDeclaracion } from '../services/declaracionesService';
+import { getMyDeclaraciones, createDeclaracion, updateDeclaracion } from '../services/declaracionesService';
 import { uploadEvidencia } from '../services/evidenciasService';
 import { useSearchParams, Link } from 'react-router-dom';
-import { ChevronLeft, CheckSquare, Upload, FileText } from 'lucide-react';
+import { ChevronLeft, CheckSquare, Upload, FileText, Check, RotateCcw } from 'lucide-react';
 
 const compressImage = (file, maxKB = 100) => {
   return new Promise((resolve) => {
@@ -138,13 +138,26 @@ export default function Declaraciones() {
         id_meta: metaSel,
         semana_nro: semana,
         descripcion_compromiso: compromiso,
-        tipo_evidencia: tipoEvi
+        tipo_evidencia: tipoEvi,
+        estado_validacion: 'Pendiente'
       });
       setCompromiso('');
       const decData = await getMyDeclaraciones(selectedInscripcion.id_edicion, user.id);
       setDeclaraciones(decData || []);
     } catch (err) {
       alert("Error al declarar: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (idDec, nuevoEstado) => {
+    try {
+      setLoading(true);
+      await updateDeclaracion(idDec, { estado_validacion: nuevoEstado });
+      setDeclaraciones(prev => prev.map(d => d.id_declaracion === idDec ? { ...d, estado_validacion: nuevoEstado } : d));
+    } catch (err) {
+      alert("Error al actualizar estado: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -157,7 +170,7 @@ export default function Declaraciones() {
       setUploading(true);
       const compressedFile = await compressImage(eviFile, 100);
       await uploadEvidencia(eviActiveId, compressedFile, eviComment);
-      alert("Evidencia subida correctamente y enviada a revisión.");
+      alert("Evidencia subida correctamente.");
       setEviActiveId(null); setEviFile(null); setEviComment('');
       const decData = await getMyDeclaraciones(selectedInscripcion.id_edicion, user.id);
       setDeclaraciones(decData || []);
@@ -172,10 +185,11 @@ export default function Declaraciones() {
     return <div style={{ padding: '2rem' }}>Cargando...</div>;
   }
 
+  // View 1: List participants
   if (isSuperior && !participantUid) {
     return (
       <div>
-        <h2 style={{ marginBottom: '2rem' }}>{isStaff ? 'Acciones de los Participantes' : 'Mis Participantes'}</h2>
+        <h2 style={{ marginBottom: '2rem' }}>{isStaff ? 'Declaraciones de los Participantes' : 'Equipo'}</h2>
         {participants.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
             <p style={{ color: 'var(--text-muted)' }}>No se encontraron participantes.</p>
@@ -212,7 +226,7 @@ export default function Declaraciones() {
             </Link>
           )}
           <div>
-            <h2 style={{ margin: 0 }}>{participantUid ? `Acciones de ${selectedParticipant?.nombre || 'Participante'}` : 'Mis Acciones & Evidencias'}</h2>
+            <h2 style={{ margin: 0 }}>{participantUid ? `Declaraciones de ${selectedParticipant?.nombre || 'Participante'}` : 'Mis Declaraciones'}</h2>
             {participantUid && <small style={{ color: 'var(--text-muted)' }}>{selectedParticipant?.email}</small>}
           </div>
         </div>
@@ -225,28 +239,21 @@ export default function Declaraciones() {
           </div>
         ) : (
           <form onSubmit={handleCreateDec} className="card" style={{ marginBottom: '2rem' }}>
-            <h4>Declarar Nueva Acción</h4>
+            <h4>Nueva Declaración Semanal</h4>
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end', marginTop: '1rem' }}>
               <div className="form-group" style={{ flex: '1 1 100px', marginBottom: 0 }}>
-                <label>Semana Nro</label>
+                <label>Semana</label>
                 <input type="number" min="1" max="50" value={semana} onChange={e => setSemana(parseInt(e.target.value))} required />
               </div>
               <div className="form-group" style={{ flex: '2 1 200px', marginBottom: 0 }}>
-                <label>Meta Asociada</label>
-                <select value={metaSel} onChange={e => setMetaSel(e.target.value)} required style={{width: '100%', padding:'0.75rem', background:'rgba(0,0,0,0.2)', color:'white', borderRadius:'0.5rem', border:'1px solid var(--border-color)'}}>
-                  {metas.map(m => <option key={m.id} value={m.id}>[{m.eje}] {m.titulo || m.descripcion.substring(0,30)}</option>)}
+                <label>Meta Relacionada</label>
+                <select value={metaSel} onChange={e => setMetaSel(e.target.value)} required>
+                  {metas.map(m => <option key={m.id} value={m.id}>[{m.eje}] {m.titulo}</option>)}
                 </select>
               </div>
               <div className="form-group" style={{ flex: '3 1 300px', marginBottom: 0 }}>
-                <label>Acción / Compromiso</label>
+                <label>¿Qué harás esta semana?</label>
                 <input type="text" value={compromiso} onChange={e => setCompromiso(e.target.value)} required />
-              </div>
-              <div className="form-group" style={{ flex: '1 1 150px', marginBottom: 0 }}>
-                <label>Ejecución</label>
-                <select value={tipoEvi} onChange={e => setTipoEvi(e.target.value)} required>
-                  <option value="única vez">1 vez</option>
-                  <option value="múltiples veces">Varias veces</option>
-                </select>
               </div>
               <button type="submit" className="btn btn-primary" style={{ width: 'auto' }}>+ Declarar</button>
             </div>
@@ -254,7 +261,7 @@ export default function Declaraciones() {
         )
       )}
 
-      <h4>Historial de Acciones Semanales</h4>
+      <h4>Historial</h4>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: '1.5rem', marginTop: '1rem' }}>
         {declaraciones.map(dec => {
            const meta = metas.find(m => m.id === dec.id_meta);
@@ -264,46 +271,38 @@ export default function Declaraciones() {
             <div key={dec.id_declaracion} className="card" style={{ marginBottom: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{color:'var(--primary-color)', fontWeight:'bold'}}>Semana {dec.semana_nro}</span>
-                <span style={{fontSize:'0.8rem', padding:'0.2rem 0.6rem', borderRadius:'1rem', background: 'rgba(255,255,255,0.05)'}}>
+                <span style={{fontSize:'0.7rem', textTransform:'uppercase', fontWeight:'bold', color: dec.estado_validacion === 'Aprobada' ? '#10b981' : (dec.estado_validacion === 'Para Reformular' ? '#ef4444' : '#fbbf24')}}>
                   {dec.estado_validacion || 'Pendiente'}
                 </span>
               </div>
               <p style={{ marginTop:'0.5rem', fontWeight:'500'}}>{dec.descripcion_compromiso}</p>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Meta Asociada: {meta ? `[${meta.eje}] ${meta.titulo || meta.descripcion.substring(0,30)}` : 'Desconocida'}
-              </p>
+              <small style={{ color: 'var(--text-muted)' }}>Meta: {meta?.titulo}</small>
               
+              {isStaff && participantUid && (
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem' }}>
+                  <button className="btn btn-primary" style={{ background: '#10b981', fontSize: '0.75rem', padding: '0.3rem 0.6rem', border: 'none' }} onClick={() => handleUpdateStatus(dec.id_declaracion, 'Aprobada')}>
+                    <Check size={14} style={{ marginRight: '0.2rem' }} /> Aprobar
+                  </button>
+                  <button className="btn btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444', fontSize: '0.75rem', padding: '0.3rem 0.6rem' }} onClick={() => handleUpdateStatus(dec.id_declaracion, 'Para Reformular')}>
+                    <RotateCcw size={14} style={{ marginRight: '0.2rem' }} /> Reformular
+                  </button>
+                </div>
+              )}
+
               {eviActiveId === dec.id_declaracion ? (
                 <form onSubmit={handleUploadEvi} style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '0.5rem', marginTop: '1rem' }}>
-                  <div className="form-group">
-                    <label>Adjuntar Foto</label>
-                    <input type="file" ref={fileInputRef} onChange={e => setEviFile(e.target.files[0])} accept="image/*" />
-                  </div>
-                  <div className="form-group">
-                    <label>Comentario</label>
-                    <input type="text" value={eviComment} onChange={e => setEviComment(e.target.value)} />
-                  </div>
-                  <div style={{display:'flex', gap:'0.5rem'}}>
-                    <button type="submit" className="btn btn-primary" disabled={uploading}>{uploading ? 'Procesando...' : 'Enviar'}</button>
+                  <input type="file" ref={fileInputRef} onChange={e => setEviFile(e.target.files[0])} accept="image/*" />
+                  <div style={{display:'flex', gap:'0.5rem', marginTop:'0.5rem'}}>
+                    <button type="submit" className="btn btn-primary" disabled={uploading}>Subir</button>
                     <button type="button" className="btn btn-secondary" onClick={()=>setEviActiveId(null)}>Cancelar</button>
                   </div>
                 </form>
               ) : (
-                <div>
-                   {eviReciente && (
-                      <div style={{marginTop:'1rem', fontSize:'0.85rem', background:'rgba(255,255,255,0.02)', padding:'0.75rem', borderRadius:'0.5rem'}}>
-                        <div style={{color:'var(--text-muted)', marginBottom:'0.25rem'}}>Última evidencia:</div>
-                        {eviReciente.url_foto_evidencia ? <a href={eviReciente.url_foto_evidencia} target="_blank" rel="noreferrer" style={{color:'var(--primary-color)', display: 'flex', alignItems: 'center', gap: '0.4rem'}}>
-                           Ver archivo
-                        </a> : <span>Archivo en proceso</span>}
-                      </div>
-                   )}
-                   {(!participantUid && dec.estado_validacion !== 'Aprobado') && (
-                     <button onClick={()=>setEviActiveId(dec.id_declaracion)} className="btn btn-secondary" style={{ marginTop: '1rem', fontSize:'0.8rem' }}>
-                       + Subir Foto
-                     </button>
-                   )}
-                </div>
+                !participantUid && dec.estado_validacion !== 'Aprobada' && (
+                  <button onClick={()=>setEviActiveId(dec.id_declaracion)} className="btn btn-secondary" style={{ marginTop: '1rem', fontSize:'0.8rem', border:'1px solid var(--primary-color)', color:'var(--primary-color)' }}>
+                    + Subir Foto
+                  </button>
+                )
               )}
             </div>
            )

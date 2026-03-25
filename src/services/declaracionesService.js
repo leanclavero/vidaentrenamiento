@@ -51,3 +51,18 @@ export const getDeclaracionesCount = async (idEdicion) => {
   return count || 0;
 };
 
+// Obtener declaraciones pendientes de validación (para Staff)
+export const getDeclaracionesPendientes = async () => {
+  const { data, error } = await supabase
+    .from('Declaraciones')
+    .select(`
+      *,
+      usuario:Metas!id_meta(id_usuario)
+    `)
+    .eq('estado_validacion', 'Pendiente');
+    
+  if (error) throw error;
+  return data;
+};
+
+
